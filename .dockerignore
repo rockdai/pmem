@@ -1,0 +1,11 @@
+.git
+.env
+.env.*
+!.env.example
+.pmem
+node_modules
+**/node_modules
+dist
+test-results
+playwright-report
+coverage

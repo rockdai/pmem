@@ -1,0 +1,43 @@
+# Use exactly one profile. Requires Docker Compose >= 2.30 (raw env_file).
+x-app: &app
+  build: .
+  image: pmem:local
+  init: true
+  restart: unless-stopped
+  env_file:
+    - path: .env
+      format: raw
+  ports:
+    - "127.0.0.1:3000:3000"
+  security_opt:
+    - no-new-privileges:true
+  cap_drop: [ALL]
+
+services:
+  pmem-local:
+    <<: *app
+    profiles: [local]
+    environment:
+      PMEM_STORAGE: local
+      PMEM_DATA_DIR: /data
+      PMEM_STATE_DIR: /state
+      PMEM_CONTAINER: "1"
+      HOST: 0.0.0.0
+      PORT: "3000"
+    volumes:
+      - notes:/data
+  pmem-oss:
+    <<: *app
+    profiles: [oss]
+    environment:
+      PMEM_STORAGE: oss
+      PMEM_DATA_DIR: /data
+      PMEM_STATE_DIR: /state
+      PMEM_CONTAINER: "1"
+      HOST: 0.0.0.0
+      PORT: "3000"
+    volumes:
+      - state:/state
+volumes:
+  notes:
+  state:

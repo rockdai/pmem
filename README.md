@@ -46,17 +46,36 @@ Personal Memory 是一款开源、支持用户自托管的个人知识库产品�
 
 开源和用户自托管是产品的基本定位。部署方式和外部服务依赖的选择，需要兼顾用户自行运行产品的能力。
 
-## 后续需要明确的验收标准
+## 运行 MVP
 
-以下事项尚未确定，应在技术选型和实现方案中明确：
+需要 Node.js 24 和 pnpm 10.32.1。先按 [部署说明](docs/deployment.md) 生成密码哈希、会话密钥并填写 `.env`，然后：
 
-- Web 端首批支持的设备、浏览器及版本范围。
-- 各类打开场景的耗时门槛、统计口径及测试环境。
-- 一期富文本编辑的功能范围，以及候选编辑器的实际打开性能。
-- 跨端内容同步的时效、保存状态反馈及同时编辑时的处理方式。
-- 弱网、断网时的记录与恢复行为。
+```bash
+corepack enable
+pnpm install --frozen-lockfile
+pnpm build
+pnpm start
+```
 
-后续方案应说明其对打开速度和多端体验的影响，并通过实际使用路径验证这两项要求。
+默认本机地址为 `http://localhost:3000`。公开访问使用 HTTPS。也可用仓库中的 Dockerfile 和 Compose 部署，本地正文卷与 OSS 模式二选一。
+
+已实现登录、最近修改列表、Markdown 富文本编辑、自动保存、删除、本机草稿恢复和多设备冲突提示。编辑器支持标题、强调、链接、列表、任务项、引用、代码块及简单 `/` 菜单。新建空编辑区不会创建远端文件；正文只在用户编辑后保存。
+
+当前采用 React / Vite、Tiptap / ProseMirror、原生 IndexedDB、Fastify 和 OSS SDK。没有 React Router 或 Dexie，首字输入需要的全部代码计入 250 KiB gzip 预算。默认每 500 ms 防抖保存，可见页面每 5 s 检查当前笔记。已打开页面断网可继续保留草稿，不承诺离线冷启动。
+
+一个存储只能由一个活动服务进程写入。每篇正文上限 1 MiB；超限内容保留在本机供缩减或复制。OSS 模式额外需要保存身份及待确认操作元数据的持久状态卷。它不保存正文副本；卷丢失、写入超时、浏览器存储不足等边界与处理步骤见部署说明。
+
+## 验证
+
+```bash
+pnpm test
+pnpm exec playwright install chromium
+pnpm test:e2e
+pnpm bench:web
+pnpm bench:list
+```
+
+跨引擎检查可安装 `chromium firefox webkit` 后运行 `PMEM_BROWSERS=all pnpm test:e2e`。真实 OSS 集成须按部署文档显式配置专用测试前缀。测试结果、原始性能样本及尚未完成的真机 / 云存储验收见 [task-090 验证记录](docs/validation/task-090.md)，不能将桌面模拟成绩当成手机已达标。
 
 ## 技术设计
 
@@ -64,5 +83,5 @@ Personal Memory 是一款开源、支持用户自托管的个人知识库产品�
 - [一期 MVP 技术架构与选型](docs/architecture/phase-1.md)：最小功能闭环、编辑器、本地草稿和多设备使用。
 - [MVP 文件存储设计](docs/architecture/storage.md)：推荐 Markdown 内容文件、本地或 OSS 二选一及保存约束。
 - [MVP 性能与多端验收](docs/architecture/performance.md)：建议速度目标、测试环境及必要用例。
-
-设计文档中的选型和数值为提案，尚未实现或完成性能验证。
+- [部署说明](docs/deployment.md)：本地和容器运行、OSS 权限、状态卷初始化及人工故障恢复。
+- [验证记录](docs/validation/task-090.md)：实际证据与验收边界。
