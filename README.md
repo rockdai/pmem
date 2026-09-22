@@ -1,2 +1,2 @@
-# mory
+# pmem
 Personal memory
