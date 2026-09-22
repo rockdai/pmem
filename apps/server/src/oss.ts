@@ -1,4 +1,5 @@
 import OSS from 'ali-oss';
+import { errorIdentity, type StorageDiagnostic } from './diagnostics';
 import { randomUUID } from 'node:crypto';
 import { readdir, readFile, statfs, unlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -280,27 +281,50 @@ export class OssStore implements Store {
     await syncDirectory(join(this.root, 'pending'));
     this.pending.delete(id);
   }
+  private uncertain(record: Pending, stage: StorageDiagnostic['stage'], error: unknown) {
+    return new AppError(503, 'write_pending', {
+      ...errorIdentity(error),
+      stage,
+      operation: record.operation,
+      noteId: record.id,
+      operationId: record.requestId,
+    });
+  }
   async settle(id: string) {
     const p = this.pending.get(id);
     if (!p) return;
-    const current = await this.read(id);
+    let current;
+    try {
+      current = await this.read(id);
+    } catch (error) {
+      throw this.uncertain(p, 'pending_verify', error);
+    }
     if (
       p.target === null ? current === null : current !== null && digest(current.body) === p.target
-    )
-      await this.clear(id);
-    else throw new AppError(503, 'write_pending');
+    ) {
+      try {
+        await this.clear(id);
+      } catch (error) {
+        throw this.uncertain(p, 'pending_clear', error);
+      }
+    } else throw this.uncertain(p, 'pending_verify', { code: 'TargetNotObserved' });
   }
-  private async change(id: string, body: Buffer | null, operation: Pending['operation']) {
+  private async change(
+    id: string,
+    body: Buffer | null,
+    operation: Pending['operation'],
+    before: string | null,
+  ) {
     await this.settle(id);
-    const previous = await this.read(id);
     const record: Pending = {
       schema: 1,
       id,
       requestId: randomUUID(),
       operation,
-      before: previous ? digest(previous.body) : null,
+      before,
       target: body === null ? null : digest(body),
     };
+    // The caller has already read and verified before under the per-note lock.
     // Keep the in-memory guard even if recording fails ambiguously. Nothing is sent before fsync.
     this.pending.set(id, record);
     try {
@@ -309,28 +333,42 @@ export class OssStore implements Store {
         `${id}.json`,
         Buffer.from(JSON.stringify(record)),
       );
-    } catch {
-      throw new AppError(503, 'write_pending');
+    } catch (error) {
+      throw this.uncertain(record, 'pending_record', error);
     }
     try {
       if (body === null) await this.gateway.delete(this.key(id));
       else await this.gateway.put(this.key(id), body, operation === 'create');
-    } catch {
-      throw new AppError(503, 'write_pending');
+    } catch (error) {
+      // Only this exact forbid-overwrite rejection proves that the create was not applied.
+      const failure = error as { code?: string; status?: number } | null;
+      if (
+        operation === 'create' &&
+        failure?.code === 'FileAlreadyExists' &&
+        failure.status === 409
+      ) {
+        try {
+          await this.clear(id);
+        } catch (cleanupError) {
+          throw this.uncertain(record, 'pending_clear', cleanupError);
+        }
+        throw new AppError(409, 'already_exists');
+      }
+      throw this.uncertain(record, 'oss_request', error);
     }
     try {
       await this.clear(id);
-    } catch {
-      throw new AppError(503, 'write_pending');
+    } catch (error) {
+      throw this.uncertain(record, 'pending_clear', error);
     }
   }
   async create(id: string, body: Buffer) {
-    await this.change(id, body, 'create');
+    await this.change(id, body, 'create', null);
   }
-  async replace(id: string, body: Buffer) {
-    await this.change(id, body, 'replace');
+  async replace(id: string, body: Buffer, before: string) {
+    await this.change(id, body, 'replace', before);
   }
-  async delete(id: string) {
-    await this.change(id, null, 'delete');
+  async delete(id: string, before: string) {
+    await this.change(id, null, 'delete', before);
   }
 }

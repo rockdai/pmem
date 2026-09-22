@@ -15,6 +15,7 @@ export class NoteController {
   readonly draft: Draft;
   private queue: Promise<void> = Promise.resolve();
   private timer?: ReturnType<typeof setTimeout>;
+  private rateTimer?: ReturnType<typeof setTimeout>;
   private maximum?: ReturnType<typeof setTimeout>;
   private inFlight = false;
   private localRev = -1;
@@ -42,6 +43,7 @@ export class NoteController {
   }
   view(): ViewState {
     const messages = {
+      rate_limit: '请求过于频繁，稍后自动重试',
       oversize: '内容超过 1 MiB，暂不能同步',
       invalid: '无法保存，可复制内容或另存为新笔记',
       auth: '登录已过期，请重新登录',
@@ -102,7 +104,11 @@ export class NoteController {
     const revision = this.draft.rev;
     if (byteSize(body) > MAX_BYTES) this.draft.block = 'oversize';
     else if (this.draft.block === 'oversize')
-      this.draft.block = this.draft.pending ? 'pending' : undefined;
+      this.draft.block = this.draft.pending
+        ? 'pending'
+        : this.draft.retry
+          ? 'rate_limit'
+          : undefined;
     this.emit();
     void this.persist()
       .then(() => {
@@ -129,6 +135,7 @@ export class NoteController {
   private cancelTimers() {
     clearTimeout(this.timer);
     clearTimeout(this.maximum);
+    clearTimeout(this.rateTimer);
     this.timer = this.maximum = undefined;
   }
   detach() {
@@ -149,7 +156,44 @@ export class NoteController {
     await this.persist();
     await this.save();
   }
+  private scheduleRateRetry() {
+    if (!this.draft.retry || this.stopped) return;
+    clearTimeout(this.rateTimer);
+    this.rateTimer = setTimeout(
+      () => {
+        void this.retryRateLimit();
+      },
+      Math.min(2 ** 31 - 1, Math.max(0, this.draft.retry.at - Date.now())),
+    );
+  }
+  private async retryRateLimit() {
+    const retry = this.draft.retry;
+    if (
+      !retry ||
+      this.draft.block !== 'rate_limit' ||
+      this.stopped ||
+      this.inFlight ||
+      this.localFailed ||
+      this.composing ||
+      this.deleted ||
+      this.draft.pending ||
+      (typeof navigator !== 'undefined' && navigator.onLine === false)
+    )
+      return;
+    if (Date.now() < retry.at) {
+      this.scheduleRateRetry();
+      return;
+    }
+    this.draft.block = undefined;
+    // New typing cancels a rejected delete; it must never be deleted by an automatic retry.
+    if (retry.kind === 'delete' && retry.rev === this.draft.rev) await this.remove();
+    else await this.save();
+  }
   async save() {
+    if (this.draft.block === 'rate_limit') {
+      await this.retryRateLimit();
+      return;
+    }
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
     if (
       this.stopped ||
@@ -163,7 +207,11 @@ export class NoteController {
     )
       return;
     if (!this.draft.base && !this.draft.meaningful) return;
-    if (byteSize(this.draft.body) > MAX_BYTES) return;
+    if (byteSize(this.draft.body) > MAX_BYTES) {
+      this.draft.block = 'oversize';
+      await this.persist().catch(() => {});
+      return;
+    }
     this.cancelTimers();
     this.inFlight = true;
     const sent: Submission = {
@@ -205,6 +253,7 @@ export class NoteController {
   }
   private async ack(sent: Submission, etag: string) {
     this.draft.base = etag;
+    this.draft.retry = undefined;
     this.draft.pending = undefined;
     this.draft.block = undefined;
     try {
@@ -234,24 +283,38 @@ export class NoteController {
         await this.reconcile(true);
         return;
       }
+      const sent = this.draft.pending;
+      if (error.status === 429) {
+        const attempts = Math.min(7, (this.draft.retry?.attempts ?? 0) + 1);
+        this.draft.retry = {
+          at:
+            Date.now() + Math.max(error.retryAfterMs, Math.min(60_000, 1000 * 2 ** (attempts - 1))),
+          attempts,
+          kind: sent?.kind ?? 'replace',
+          rev: sent?.rev ?? this.draft.rev,
+        };
+      } else this.draft.retry = undefined;
       this.draft.pending = undefined;
       this.draft.block =
-        error.status === 413
-          ? 'oversize'
-          : error.status === 401
-            ? 'auth'
-            : error.status === 404
-              ? 'deleted'
-              : error.status === 412
-                ? 'conflict'
-                : 'invalid';
-      if (error.status === 401) this.onAuth();
+        error.status === 429
+          ? 'rate_limit'
+          : error.status === 413
+            ? 'oversize'
+            : error.status === 401 || (error.status === 403 && error.code === 'csrf_rejected')
+              ? 'auth'
+              : error.status === 404
+                ? 'deleted'
+                : error.status === 412
+                  ? 'conflict'
+                  : 'invalid';
+      if (this.draft.block === 'auth') this.onAuth();
     } else this.draft.block = 'pending';
     try {
       await this.persist();
     } catch {
       /* retain in memory and report */
     }
+    if (this.draft.block === 'rate_limit') this.scheduleRateRetry();
   }
   private async reconcile(rejectedCreate = false) {
     const sent = this.draft.pending;
@@ -283,32 +346,29 @@ export class NoteController {
   }
   async refresh() {
     if (this.stopped || this.polling || this.inFlight || this.deleted) return;
+    if (this.draft.block === 'rate_limit') {
+      await this.retryRateLimit();
+      return;
+    }
     this.polling = true;
     try {
+      if (this.draft.block === 'auth') {
+        await this.api.refreshSession();
+        this.draft.block = this.draft.pending ? 'pending' : undefined;
+        await this.persist();
+      }
       if (this.draft.pending) {
         await this.reconcile();
         return;
       }
-      if (!this.draft.base) {
-        if (this.draft.block === 'auth') {
-          this.draft.block = undefined;
-          await this.persist();
-        }
-        return;
-      }
+      if (!this.draft.base) return;
       const baseline = this.draft.base,
         revision = this.draft.rev;
       const response = await this.api.call(`/notes/${this.draft.id}`, {
         headers: { 'if-none-match': this.draft.base },
       });
       if (this.draft.base !== baseline || this.draft.rev !== revision) return;
-      if (response.status === 304) {
-        if (this.draft.block === 'auth') {
-          this.draft.block = undefined;
-          await this.persist();
-        }
-        return;
-      }
+      if (response.status === 304) return;
       const body = await response.text(),
         etag = response.headers.get('etag');
       if (!etag) return;
@@ -353,6 +413,7 @@ export class NoteController {
     this.draft.body = body;
     this.draft.base = etag;
     this.draft.rev++;
+    this.draft.retry = undefined;
     this.draft.block = undefined;
     this.remote = undefined;
     const applied = this.draft.rev;
@@ -377,6 +438,7 @@ export class NoteController {
     }
   }
   private async finishDelete() {
+    this.draft.retry = undefined;
     this.cancelTimers();
     await this.queue.catch(() => {});
     await this.db.forget(this.draft.namespace, this.draft.id);
@@ -394,6 +456,10 @@ export class NoteController {
     this.emit();
   }
   async remove() {
+    if (this.draft.block === 'rate_limit') {
+      await this.retryRateLimit();
+      return false;
+    }
     if (this.stopped || this.composing || this.inFlight || this.draft.pending) return false;
     if (!this.draft.base) {
       await this.finishDelete();

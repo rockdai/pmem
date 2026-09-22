@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import { errorIdentity, safeToken, writeDiagnostic, type DiagnosticSink } from './diagnostics';
 import secureSession from '@fastify/secure-session';
 import rateLimit from '@fastify/rate-limit';
 import staticFiles from '@fastify/static';
@@ -17,7 +18,12 @@ declare module '@fastify/secure-session' {
   }
 }
 
-export async function createApp(config: Config, store: Store, webRoot = resolve('dist/web')) {
+export async function createApp(
+  config: Config,
+  store: Store,
+  webRoot = resolve('dist/web'),
+  diagnostic: DiagnosticSink = writeDiagnostic,
+) {
   const app = Fastify({
     logger: false,
     bodyLimit: MAX_BYTES,
@@ -75,7 +81,7 @@ export async function createApp(config: Config, store: Store, webRoot = resolve(
     if (mutation && !equal(request.headers['x-csrf-token'], request.session.get('csrf') ?? ''))
       throw new AppError(403, 'csrf_rejected');
   });
-  app.setErrorHandler((error, _request, reply) => {
+  app.setErrorHandler((error, request, reply) => {
     const known = error instanceof AppError;
     const candidate = (error as { statusCode?: number }).statusCode;
     const status = known ? error.status : candidate && candidate < 500 ? candidate : 503;
@@ -88,6 +94,21 @@ export async function createApp(config: Config, store: Store, webRoot = resolve(
           : status < 500
             ? 'invalid_request'
             : 'storage_unavailable';
+    if (status >= 500) {
+      try {
+        diagnostic({
+          ...((known && error.diagnostic) || errorIdentity(error)),
+          event: 'request_error',
+          requestId: safeToken(request.id),
+          method: request.method,
+          route: request.routeOptions.url,
+          status,
+          code,
+        });
+      } catch {
+        /* A broken logging sink must not change the HTTP outcome. */
+      }
+    }
     reply.status(status).send({ error: code });
   });
   app.get('/healthz', async () => ({ ok: true }));

@@ -99,6 +99,19 @@ docker compose --profile oss up -d
 
 每次修改前先同步 pending 记录，OSS SDK 修改请求不自动重试。超时不能证明写入未发生；该笔记保持暂停，后台只能读回核对。读到目标内容或删除目标已不存在才解除；读到旧内容仍暂停。浏览器显示“保存结果待确认”，草稿保留，可复制或以新 ID 另存。服务重启继续遵循原 pending 记录。
 
+正常更新复用 If-Match 校验时读取的正文摘要，每次只需一次完整 GET 和一次 PUT；待确认操作的读回核对另计。若禁止覆盖的创建请求明确返回 OSS `409 FileAlreadyExists`，在 pending 记录删除并完成目录 fsync 后返回 `409 already_exists`，由客户端读回核对并处理冲突。其他异常仍按待确认处理；清理失败也不能报告确定成功或绕过保护。
+
+运行期 5xx 在标准错误输出一行 JSON 诊断。记录 HTTP 请求 ID、路由模板、状态与错误码；OSS 待确认另含笔记 ID、操作 ID、操作类型和阶段。SDK 错误仅提取有界的类名、错误码和 OSS requestId，不打印原始 message、stack、响应对象、URL、请求头、凭据或正文。操作 ID 对应 pending 文件的 `requestId`，可与 OSS requestId 一起辅助排查：
+
+| `stage` | 排查方向 |
+| --- | --- |
+| `pending_record` | 本地状态记录未能可靠落盘，检查状态卷空间、权限和 I/O；尚未发出本次 OSS 修改 |
+| `oss_request` | 修改请求失败或响应丢失；通过错误码及 OSS requestId 检查网络、RAM 权限或云端请求结果 |
+| `pending_clear` | 请求结束后或读回确认后的状态清理失败，检查状态卷 I/O / fsync |
+| `pending_verify` | 读回失败，或 `TargetNotObserved` 表示尚未读到目标结果；后者没有可关联的新 OSS 错误 requestId |
+
+容器用 `docker compose --profile oss logs --tail 100` 查看；直接运行 Node 时保留标准错误输出。`storage_unavailable` 的其他 5xx 同样记录有界错误标识。日志用于定位原因，不能据此删除 pending 或自动重放未知修改；仍按读回核对或下文隔离恢复流程处理。
+
 每个可见页面约每分钟 12 次当前笔记条件检查。缓存已热时通常对应 12 次 HEAD，不下载正文；首次读取、进程重启、128 项缓存淘汰或闲置 30 分钟后需要完整 GET。HEAD 和列表均有请求成本。列表每次完整列举文件元数据，只读取当前页最多 50 篇的前 8 KiB；10,000 篇约需 10 个 ListObjectsV2 页面，不宣称固定首屏延迟。
 
 ## OSS 状态卷永久丢失
@@ -139,3 +152,9 @@ PMEM_OSS_INTEGRATION=1 PMEM_OSS_TEST_PREFIX=test-unique-run-name/ pnpm test:oss
 为该测试前缀单独授予同类权限，并额外允许删除该测试前缀的 `control/state-owner`。脚本只删除本轮创建的确切键，不递归清空前缀；初始化中断可能留下一份隔离的测试身份标记，先检查后再人工清理，不复用有未知请求的前缀。
 
 容器本地存储冒烟：`docker build -t pmem:ci .` 后 `bash scripts/container-smoke.sh`。另需在测试 OSS 环境检查正常重启、断网写入、空卷、错卷、tmpfs、遗漏独立挂载：启动失败必须发生在任何正文修改之前。丢包、云端请求延迟、真机中文键盘、Safari/Chrome 移动版与正式 Linux 服务器的硬指标需要单独验收，实际证据见 [验证记录](validation/task-090.md)。
+
+## 浏览器保存恢复与后续事项
+
+多标签页重新登录后，认证阻塞先读取当前会话、更新 CSRF 再恢复；写入明确返回 `403 csrf_rejected` 时更新会话并最多重试一次。其他 403（例如 Origin 不匹配）不会通过刷新令牌绕过。写入 429 的重试时间、次数和操作类型随当前草稿持久化，遵守 `Retry-After`，并采用 1 秒起、上限 60 秒的指数退避；刷新页面或继续输入不会跳过等待。未知写入仍只读核对，不能当作限流自动重放。
+
+待办：评估 IndexedDB 不可用时的“仅远端保存”模式。本期继续在本机持久化提交状态后发送，失败时保留内存文字、支持复制和重试本机保存。直接跳过持久化会丢失刷新后的在途操作信息，必须先定义未知提交、离线、重载与状态提示的保证，再单独实现和验证；本轮不启用该模式。

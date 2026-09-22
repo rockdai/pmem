@@ -85,6 +85,13 @@ export function App() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+  useEffect(() => {
+    if (!api) return;
+    api.onSession = () => setExpired(false);
+    return () => {
+      api.onSession = () => {};
+    };
+  }, [api]);
   const login = (session: SessionInfo) => {
     if (api) api.session = session;
     else setApi(new Api(session));

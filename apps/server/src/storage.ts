@@ -1,3 +1,4 @@
+import type { StorageDiagnostic } from './diagnostics';
 import { createHash } from 'node:crypto';
 import {
   MAX_BYTES,
@@ -9,6 +10,7 @@ export class AppError extends Error {
   constructor(
     public status: number,
     public code: string,
+    public diagnostic?: StorageDiagnostic,
   ) {
     super(code);
   }
@@ -28,8 +30,8 @@ export interface Store {
   head(id: string): Promise<Meta | null>;
   read(id: string, limit?: number): Promise<Stored | null>;
   create(id: string, body: Buffer): Promise<void>;
-  replace(id: string, body: Buffer): Promise<void>;
-  delete(id: string): Promise<void>;
+  replace(id: string, body: Buffer, before: string): Promise<void>;
+  delete(id: string, before: string): Promise<void>;
   settle?(id: string): Promise<void>;
 }
 export const digest = (body: Buffer) => `"${createHash('sha256').update(body).digest('hex')}"`;
@@ -127,8 +129,9 @@ export class Notes {
         await this.store.create(id, body);
       } else {
         if (!current) throw new AppError(404, 'not_found');
-        if (digest(current.body) !== match) throw new AppError(412, 'conflict');
-        if (!current.body.equals(body)) await this.store.replace(id, body);
+        const before = digest(current.body);
+        if (before !== match) throw new AppError(412, 'conflict');
+        if (!current.body.equals(body)) await this.store.replace(id, body, before);
       }
       return digest(body);
     });
@@ -141,8 +144,9 @@ export class Notes {
       await this.store.settle?.(id);
       const current = await this.store.read(id);
       if (!current) throw new AppError(404, 'not_found');
-      if (digest(current.body) !== match) throw new AppError(412, 'conflict');
-      await this.store.delete(id);
+      const before = digest(current.body);
+      if (before !== match) throw new AppError(412, 'conflict');
+      await this.store.delete(id, before);
     });
   }
   async list(cursor?: string, limit = 20): Promise<NotePage> {

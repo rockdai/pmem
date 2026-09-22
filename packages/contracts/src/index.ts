@@ -14,7 +14,14 @@ export interface SessionInfo {
   deployment: string;
   csrf: string;
 }
-export type BlockReason = 'oversize' | 'invalid' | 'auth' | 'conflict' | 'deleted' | 'pending';
+export type BlockReason =
+  | 'rate_limit'
+  | 'oversize'
+  | 'invalid'
+  | 'auth'
+  | 'conflict'
+  | 'deleted'
+  | 'pending';
 export function noteTitle(body: string) {
   const line = body.split(/\r?\n/).find((value) => value.trim()) ?? '';
   return (

@@ -19,7 +19,7 @@ async function login(context: BrowserContext) {
 async function ready(page: Page) {
   await expect(page.getByRole('textbox', { name: '笔记正文', exact: true })).toBeVisible();
 }
-test('login, empty creation, write, rich format, reload and delete', async ({ page }) => {
+test('login, empty creation, write, rich format, reload and delete', async ({ page, context }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
@@ -27,6 +27,10 @@ test('login, empty creation, write, rich format, reload and delete', async ({ pa
   await page.getByLabel('密码').fill('browser-test-password');
   await page.getByRole('button', { name: '进入笔记本' }).click();
   await ready(page);
+  cachedLogin = {
+    cookies: await context.cookies(),
+    session: await (await context.request.get('/api/v1/auth/session')).json(),
+  };
   const id = page.url().split('/').at(-1)!;
   const before = await page.request.get(`/api/v1/notes/${id}`);
   expect(before.status()).toBe(404);
@@ -356,4 +360,50 @@ test('draft recovery paginates without discarding unsynchronized content', async
   await expect(dialog.getByRole('button', { name: '恢复', exact: true })).toHaveCount(5);
   await dialog.getByRole('button', { name: '加载更多' }).click();
   await expect(dialog.getByRole('button', { name: '恢复', exact: true })).toHaveCount(7);
+});
+
+test('reauthentication in one tab resumes the other tab with its original note and latest draft', async ({
+  page,
+  context,
+}) => {
+  await login(context);
+  await page.goto('/');
+  await ready(page);
+  const editorA = page.getByRole('textbox', { name: '笔记正文', exact: true });
+  await editorA.fill('tab A baseline');
+  await expect(page.getByText('已同步', { exact: true })).toBeVisible();
+  const other = await context.newPage();
+  await other.goto('/');
+  await ready(other);
+  const editorB = other.getByRole('textbox', { name: '笔记正文', exact: true });
+  await editorB.fill('tab B baseline');
+  await expect(other.getByText('已同步', { exact: true })).toBeVisible();
+  const originalUrl = other.url(),
+    id = originalUrl.split('/').at(-1)!;
+  await context.clearCookies();
+  await page.bringToFront();
+  await editorA.fill('tab A during expiry');
+  await expect(page.getByLabel('密码')).toBeVisible();
+  await other.bringToFront();
+  await editorB.fill('tab B latest local draft');
+  await expect(other.getByLabel('密码')).toBeVisible();
+  await page.bringToFront();
+  await page.getByLabel('账号').fill('me');
+  await page.getByLabel('密码').fill('browser-test-password');
+  await page.getByRole('button', { name: '进入笔记本' }).click();
+  await expect(page.getByLabel('密码')).toBeHidden();
+  await other.bringToFront();
+  await other.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await expect(other.getByLabel('密码')).toBeHidden({ timeout: 10_000 });
+  await expect(other.getByText('已同步', { exact: true })).toBeVisible();
+  expect(other.url()).toBe(originalUrl);
+  expect(await (await other.request.get(`/api/v1/notes/${id}`)).text()).toBe(
+    'tab B latest local draft',
+  );
+  await editorB.fill('tab B continues editing');
+  await expect(other.getByText('已同步', { exact: true })).toBeVisible();
+  await other.reload();
+  await expect(editorB).toHaveText('tab B continues editing');
+  expect(other.url()).toBe(originalUrl);
+  await other.close();
 });

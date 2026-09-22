@@ -17,6 +17,7 @@ export interface Draft {
   meaningful: boolean;
   block?: BlockReason;
   pending?: Submission;
+  retry?: { at: number; attempts: number; kind: Submission['kind']; rev: number };
 }
 export interface Clean {
   key: string;
