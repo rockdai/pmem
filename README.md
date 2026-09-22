@@ -60,6 +60,7 @@ Personal Memory 是一款开源、支持用户自托管的个人知识库产品�
 
 ## 技术设计
 
+- [task-090 实现规格](docs/specs/bx-task-090-8f43e4f2d7d6539f.md)：本任务的实现范围、接口约定、评审与验收入口。
 - [一期 MVP 技术架构与选型](docs/architecture/phase-1.md)：最小功能闭环、编辑器、本地草稿和多设备使用。
 - [MVP 文件存储设计](docs/architecture/storage.md)：推荐 Markdown 内容文件、本地或 OSS 二选一及保存约束。
 - [MVP 性能与多端验收](docs/architecture/performance.md)：建议速度目标、测试环境及必要用例。
