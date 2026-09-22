@@ -1,1 +1,5 @@
-{"name":"@pmem/server","private":true,"type":"module"}
+{
+  "name": "@pmem/server",
+  "private": true,
+  "type": "module"
+}

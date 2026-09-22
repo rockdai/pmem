@@ -124,6 +124,10 @@ pnpm exec playwright install chromium
 pnpm test:e2e
 pnpm bench:web
 pnpm bench:list
+# 可选的弱网或长文压力样本；CDP 限速不包含 1% 丢包：
+PMEM_BENCH_NETWORK=weak pnpm bench:web
+PMEM_BENCH_CHARACTERS=20000 pnpm bench:web
+PMEM_BENCH_CHARACTERS=330000 pnpm bench:web
 ```
 
 真实 OSS 集成需要专门的空测试前缀和授权测试凭据；不会默认连接用户 Bucket：

@@ -1,1 +1,5 @@
-{"name":"@pmem/contracts","private":true,"type":"module"}
+{
+  "name": "@pmem/contracts",
+  "private": true,
+  "type": "module"
+}
