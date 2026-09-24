@@ -1,0 +1,52 @@
+{
+  "name": "personal-memory",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "packageManager": "pnpm@10.32.1",
+  "scripts": {
+    "dev": "tsx watch apps/server/src/main.ts",
+    "dev:web": "vite --config apps/web/vite.config.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "bench:web": "PMEM_BENCH=1 playwright test performance.spec.ts",
+    "bench:list": "tsx scripts/bench-list.ts",
+    "test:oss": "tsx scripts/oss-integration.ts",
+    "build": "pnpm typecheck && vite build --config apps/web/vite.config.ts && esbuild apps/server/src/main.ts apps/server/src/cli.ts --bundle --platform=node --format=esm --packages=external --outdir=dist/server && node scripts/bundle-budget.mjs",
+    "start": "node dist/server/main.js",
+    "setup": "tsx apps/server/src/cli.ts"
+  },
+  "dependencies": {
+    "@fastify/rate-limit": "^11.2.0",
+    "@fastify/secure-session": "^8.4.0",
+    "@fastify/static": "^10.1.4",
+    "@tiptap/core": "3.31.3",
+    "@tiptap/extension-hard-break": "3.31.3",
+    "@tiptap/extension-task-item": "3.31.3",
+    "@tiptap/extension-task-list": "3.31.3",
+    "@tiptap/markdown": "3.31.3",
+    "@tiptap/pm": "3.31.3",
+    "@tiptap/starter-kit": "3.31.3",
+    "ali-oss": "^6.23.0",
+    "fastify": "^5.12.5",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/ali-oss": "^6.23.3",
+    "@types/node": "^24.13.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "esbuild": "^0.28.2",
+    "fake-indexeddb": "^6.2.5",
+    "jsdom": "^30.1.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.1"
+  }
+}

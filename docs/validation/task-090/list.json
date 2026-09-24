@@ -1,0 +1,386 @@
+{
+  "date": "2026-09-22T17:48:30.219Z",
+  "platform": "darwin",
+  "cpu": "Apple M4",
+  "note": "Local temporary filesystem; service.list including full metadata scan, sorting and 20 snippets; no HTTP/network delay; report-only target",
+  "reports": [
+    {
+      "size": 1000,
+      "p50": 9.243375000000015,
+      "p95": 12.38145800000001,
+      "maximum": 12.42179200000001,
+      "failures": 0,
+      "samples": [
+        {
+          "ms": 10.876750000000001,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 11.144708999999992,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 12.38145800000001,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 11.928083999999984,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 10.783332999999999,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 9.454667,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 10.900417000000004,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 9.416291999999999,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 9.06441700000002,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 11.193832999999984,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 12.42179200000001,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 9.148499999999984,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 8.714792000000017,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 9.465749999999986,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 9.331333999999998,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 9.01404199999999,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 9.243375000000015,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 9.078125,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 8.576041999999973,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 9.201000000000022,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 9.641500000000008,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 9.86224999999996,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 8.419708000000014,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 9.173999999999978,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 9.392874999999947,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 8.408541999999954,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 8.028957999999989,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 8.800292000000013,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 8.295833000000016,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 9.064041999999972,
+          "statRequests": 1000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        }
+      ]
+    },
+    {
+      "size": 10000,
+      "p50": 70.32762500000035,
+      "p95": 85.64491699999985,
+      "maximum": 92.42500000000018,
+      "failures": 0,
+      "samples": [
+        {
+          "ms": 77.72995800000001,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 70.56050000000005,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 69.13045799999998,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 79.60220900000013,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 71.83537500000011,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 74.03033400000004,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 79.32787499999995,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 66.72125000000005,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 92.42500000000018,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 69.28520900000012,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 66.37804200000005,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 84.817542,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 67.62574999999993,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 72.92141700000002,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 85.64491699999985,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 70.489959,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 73.01600000000008,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 71.31974999999989,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 69.18158300000005,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 67.239959,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 67.66304100000025,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 70.32762500000035,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 66.99783399999978,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 69.33845799999972,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 67.89516700000013,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 70.26249999999982,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 69.92583299999978,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 69.88708300000008,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 80.09920800000009,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        },
+        {
+          "ms": 72.01508400000012,
+          "statRequests": 10000,
+          "snippetReads": 20,
+          "snippetBytes": 120440
+        }
+      ]
+    }
+  ]
+}

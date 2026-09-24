@@ -1,0 +1,639 @@
+{
+  "date": "2026-09-22T18:01:51.540Z",
+  "environment": {
+    "platform": "darwin",
+    "release": "24.6.0",
+    "cpu": "Apple M4",
+    "cpuCount": 10,
+    "node": "v24.14.1",
+    "browser": "153.0.8010.12",
+    "network": "CDP 10 Mbps down / 2 Mbps up / 150 ms latency; local server; no CPU throttling",
+    "note": "about 2000 Chinese characters; actual input, IndexedDB commit and reload on every sample"
+  },
+  "summary": {
+    "cold": {
+      "samples": 30,
+      "failures": 0,
+      "readyP50": 938.8000001907349,
+      "readyP95": 951.4000000953674,
+      "readyMax": 954.5,
+      "inputP95": 22.800000190734863,
+      "throughFirstDraftP95": 993.7000002861023
+    },
+    "warm": {
+      "samples": 30,
+      "failures": 0,
+      "readyP50": 434.09999990463257,
+      "readyP95": 445,
+      "readyMax": 933.5999999046326,
+      "inputP95": 21.200000286102295,
+      "throughFirstDraftP95": 494.90000009536743
+    }
+  },
+  "samples": {
+    "cold": [
+      {
+        "ready": 939.9000000953674,
+        "firstInputToDraft": 2.5,
+        "navigationThroughFirstDraft": 981.1000003814697,
+        "read": 186.69999980926514,
+        "markdown": 7,
+        "editor": 19,
+        "draft": 0.6000003814697266,
+        "wireBytes": 223645
+      },
+      {
+        "ready": 942.4000000953674,
+        "firstInputToDraft": 22.800000190734863,
+        "navigationThroughFirstDraft": 993.4000000953674,
+        "read": 189.19999980926514,
+        "markdown": 7.099999904632568,
+        "editor": 19.5,
+        "draft": 20.90000009536743,
+        "wireBytes": 223656
+      },
+      {
+        "ready": 939.3999996185303,
+        "firstInputToDraft": 21.40000009536743,
+        "navigationThroughFirstDraft": 986.5,
+        "read": 184.19999980926514,
+        "markdown": 7.299999713897705,
+        "editor": 19.699999809265137,
+        "draft": 19.40000009536743,
+        "wireBytes": 223667
+      },
+      {
+        "ready": 929.4000000953674,
+        "firstInputToDraft": 2.700000286102295,
+        "navigationThroughFirstDraft": 958.2000002861023,
+        "read": 184.59999990463257,
+        "markdown": 6.900000095367432,
+        "editor": 19.40000009536743,
+        "draft": 0.6000003814697266,
+        "wireBytes": 223678
+      },
+      {
+        "ready": 934.9000000953674,
+        "firstInputToDraft": 19.199999809265137,
+        "navigationThroughFirstDraft": 975.5,
+        "read": 182.40000009536743,
+        "markdown": 6.099999904632568,
+        "editor": 17.59999990463257,
+        "draft": 17.09999990463257,
+        "wireBytes": 223689
+      },
+      {
+        "ready": 924.3000001907349,
+        "firstInputToDraft": 16.299999713897705,
+        "navigationThroughFirstDraft": 974.1999998092651,
+        "read": 182.09999990463257,
+        "markdown": 7.199999809265137,
+        "editor": 18,
+        "draft": 14.299999713897705,
+        "wireBytes": 223700
+      },
+      {
+        "ready": 947.9000000953674,
+        "firstInputToDraft": 20.800000190734863,
+        "navigationThroughFirstDraft": 994.9000000953674,
+        "read": 175.69999980926514,
+        "markdown": 7,
+        "editor": 19.600000381469727,
+        "draft": 18.90000009536743,
+        "wireBytes": 223711
+      },
+      {
+        "ready": 939.4000000953674,
+        "firstInputToDraft": 21.5,
+        "navigationThroughFirstDraft": 986.5,
+        "read": 184.09999990463257,
+        "markdown": 7.100000381469727,
+        "editor": 19.40000009536743,
+        "draft": 19.59999990463257,
+        "wireBytes": 223722
+      },
+      {
+        "ready": 942.9000000953674,
+        "firstInputToDraft": 18.300000190734863,
+        "navigationThroughFirstDraft": 987.3000001907349,
+        "read": 186.60000038146973,
+        "markdown": 7.200000286102295,
+        "editor": 19.90000009536743,
+        "draft": 16.40000009536743,
+        "wireBytes": 223733
+      },
+      {
+        "ready": 932.9000000953674,
+        "firstInputToDraft": 15.300000190734863,
+        "navigationThroughFirstDraft": 981.4000000953674,
+        "read": 186.39999961853027,
+        "markdown": 5.900000095367432,
+        "editor": 18.799999713897705,
+        "draft": 13.5,
+        "wireBytes": 223744
+      },
+      {
+        "ready": 917.0999999046326,
+        "firstInputToDraft": 23,
+        "navigationThroughFirstDraft": 965.9000000953674,
+        "read": 178.7999997138977,
+        "markdown": 7.199999809265137,
+        "editor": 20,
+        "draft": 21.09999990463257,
+        "wireBytes": 223755
+      },
+      {
+        "ready": 951.4000000953674,
+        "firstInputToDraft": 16.699999809265137,
+        "navigationThroughFirstDraft": 989.3000001907349,
+        "read": 187.59999990463257,
+        "markdown": 7,
+        "editor": 19.40000009536743,
+        "draft": 14.699999809265137,
+        "wireBytes": 223767
+      },
+      {
+        "ready": 940.8000001907349,
+        "firstInputToDraft": 2.6999998092651367,
+        "navigationThroughFirstDraft": 971.9000000953674,
+        "read": 187.59999990463257,
+        "markdown": 7,
+        "editor": 19.40000009536743,
+        "draft": 0.5,
+        "wireBytes": 223779
+      },
+      {
+        "ready": 954.5,
+        "firstInputToDraft": 5.5,
+        "navigationThroughFirstDraft": 982.2000002861023,
+        "read": 185.59999990463257,
+        "markdown": 7.099999904632568,
+        "editor": 19.59999990463257,
+        "draft": 3.6000003814697266,
+        "wireBytes": 223791
+      },
+      {
+        "ready": 918.2999997138977,
+        "firstInputToDraft": 4.600000381469727,
+        "navigationThroughFirstDraft": 950,
+        "read": 182.19999980926514,
+        "markdown": 5.299999713897705,
+        "editor": 13.599999904632568,
+        "draft": 2.3000001907348633,
+        "wireBytes": 223803
+      },
+      {
+        "ready": 936.4000000953674,
+        "firstInputToDraft": 21.199999809265137,
+        "navigationThroughFirstDraft": 987.2999997138977,
+        "read": 169.39999961853027,
+        "markdown": 6,
+        "editor": 14.700000286102295,
+        "draft": 19.399999618530273,
+        "wireBytes": 223815
+      },
+      {
+        "ready": 941.8000001907349,
+        "firstInputToDraft": 11.699999809265137,
+        "navigationThroughFirstDraft": 989.9000000953674,
+        "read": 185.5,
+        "markdown": 7.199999809265137,
+        "editor": 17.899999618530273,
+        "draft": 9.699999809265137,
+        "wireBytes": 223827
+      },
+      {
+        "ready": 922.8000001907349,
+        "firstInputToDraft": 22.199999809265137,
+        "navigationThroughFirstDraft": 971.4000000953674,
+        "read": 175.7999997138977,
+        "markdown": 7.200000286102295,
+        "editor": 20.40000009536743,
+        "draft": 20.199999809265137,
+        "wireBytes": 223839
+      },
+      {
+        "ready": 942.2999997138977,
+        "firstInputToDraft": 14.900000095367432,
+        "navigationThroughFirstDraft": 990,
+        "read": 187.19999980926514,
+        "markdown": 6.900000095367432,
+        "editor": 19,
+        "draft": 12.900000095367432,
+        "wireBytes": 223851
+      },
+      {
+        "ready": 936,
+        "firstInputToDraft": 22.40000009536743,
+        "navigationThroughFirstDraft": 986,
+        "read": 184.19999980926514,
+        "markdown": 7,
+        "editor": 19.5,
+        "draft": 20.5,
+        "wireBytes": 223863
+      },
+      {
+        "ready": 942.5,
+        "firstInputToDraft": 20.200000286102295,
+        "navigationThroughFirstDraft": 993.7000002861023,
+        "read": 178.09999990463257,
+        "markdown": 5.400000095367432,
+        "editor": 13.299999713897705,
+        "draft": 18.100000381469727,
+        "wireBytes": 223875
+      },
+      {
+        "ready": 917.5,
+        "firstInputToDraft": 8.5,
+        "navigationThroughFirstDraft": 951.4000000953674,
+        "read": 184.19999980926514,
+        "markdown": 5.5,
+        "editor": 18.399999618530273,
+        "draft": 6.5,
+        "wireBytes": 223887
+      },
+      {
+        "ready": 937.6999998092651,
+        "firstInputToDraft": 22.399999618530273,
+        "navigationThroughFirstDraft": 986.3999996185303,
+        "read": 184.5,
+        "markdown": 7.300000190734863,
+        "editor": 20.59999990463257,
+        "draft": 20.399999618530273,
+        "wireBytes": 223899
+      },
+      {
+        "ready": 914.0999999046326,
+        "firstInputToDraft": 14.099999904632568,
+        "navigationThroughFirstDraft": 954,
+        "read": 181.7000002861023,
+        "markdown": 7.200000286102295,
+        "editor": 19.40000009536743,
+        "draft": 12.099999904632568,
+        "wireBytes": 223911
+      },
+      {
+        "ready": 942.6999998092651,
+        "firstInputToDraft": 6.699999809265137,
+        "navigationThroughFirstDraft": 971.0999999046326,
+        "read": 186.59999990463257,
+        "markdown": 7.099999904632568,
+        "editor": 19.40000009536743,
+        "draft": 4.699999809265137,
+        "wireBytes": 223923
+      },
+      {
+        "ready": 938.8000001907349,
+        "firstInputToDraft": 15,
+        "navigationThroughFirstDraft": 988.5,
+        "read": 186.80000019073486,
+        "markdown": 7.400000095367432,
+        "editor": 19.90000009536743,
+        "draft": 13.099999904632568,
+        "wireBytes": 223935
+      },
+      {
+        "ready": 931.8999996185303,
+        "firstInputToDraft": 11,
+        "navigationThroughFirstDraft": 963.8999996185303,
+        "read": 184,
+        "markdown": 7.099999904632568,
+        "editor": 19.40000009536743,
+        "draft": 8.899999618530273,
+        "wireBytes": 223947
+      },
+      {
+        "ready": 942,
+        "firstInputToDraft": 14.200000286102295,
+        "navigationThroughFirstDraft": 992.5999999046326,
+        "read": 183,
+        "markdown": 7.300000190734863,
+        "editor": 18.700000286102295,
+        "draft": 12.200000286102295,
+        "wireBytes": 223959
+      },
+      {
+        "ready": 943.0999999046326,
+        "firstInputToDraft": 21.59999990463257,
+        "navigationThroughFirstDraft": 990.5,
+        "read": 184.90000009536743,
+        "markdown": 7.099999904632568,
+        "editor": 19.199999809265137,
+        "draft": 19.59999990463257,
+        "wireBytes": 223971
+      },
+      {
+        "ready": 926.4000000953674,
+        "firstInputToDraft": 22.09999990463257,
+        "navigationThroughFirstDraft": 974.2999997138977,
+        "read": 185.10000038146973,
+        "markdown": 7.199999809265137,
+        "editor": 19.399999618530273,
+        "draft": 20.299999713897705,
+        "wireBytes": 223983
+      }
+    ],
+    "warm": [
+      {
+        "ready": 933.5999999046326,
+        "firstInputToDraft": 14.799999713897705,
+        "navigationThroughFirstDraft": 1413.2999997138977,
+        "read": 183.89999961853027,
+        "markdown": 6.900000095367432,
+        "editor": 16.90000009536743,
+        "draft": 12,
+        "wireBytes": 224295
+      },
+      {
+        "ready": 426,
+        "firstInputToDraft": 7.400000095367432,
+        "navigationThroughFirstDraft": 456.90000009536743,
+        "read": 0,
+        "markdown": 6,
+        "editor": 15.5,
+        "draft": 5.5,
+        "wireBytes": 422
+      },
+      {
+        "ready": 411.09999990463257,
+        "firstInputToDraft": 15.900000095367432,
+        "navigationThroughFirstDraft": 451.40000009536743,
+        "read": 0,
+        "markdown": 6.400000095367432,
+        "editor": 15.699999809265137,
+        "draft": 14,
+        "wireBytes": 422
+      },
+      {
+        "ready": 434.09999990463257,
+        "firstInputToDraft": 11.600000381469727,
+        "navigationThroughFirstDraft": 464.90000009536743,
+        "read": 0,
+        "markdown": 6.299999713897705,
+        "editor": 15.700000286102295,
+        "draft": 9.800000190734863,
+        "wireBytes": 422
+      },
+      {
+        "ready": 425.19999980926514,
+        "firstInputToDraft": 15.199999809265137,
+        "navigationThroughFirstDraft": 462.8999996185303,
+        "read": 0,
+        "markdown": 6.100000381469727,
+        "editor": 15.200000286102295,
+        "draft": 13.099999904632568,
+        "wireBytes": 422
+      },
+      {
+        "ready": 432.59999990463257,
+        "firstInputToDraft": 18,
+        "navigationThroughFirstDraft": 472.80000019073486,
+        "read": 0,
+        "markdown": 6.699999809265137,
+        "editor": 16.299999713897705,
+        "draft": 16,
+        "wireBytes": 422
+      },
+      {
+        "ready": 441,
+        "firstInputToDraft": 5,
+        "navigationThroughFirstDraft": 465.30000019073486,
+        "read": 0,
+        "markdown": 6.300000190734863,
+        "editor": 16.09999990463257,
+        "draft": 3.0999999046325684,
+        "wireBytes": 422
+      },
+      {
+        "ready": 440.2000002861023,
+        "firstInputToDraft": 17.199999809265137,
+        "navigationThroughFirstDraft": 477.40000009536743,
+        "read": 0,
+        "markdown": 6.299999713897705,
+        "editor": 19.799999713897705,
+        "draft": 15.300000190734863,
+        "wireBytes": 422
+      },
+      {
+        "ready": 409.30000019073486,
+        "firstInputToDraft": 6.800000190734863,
+        "navigationThroughFirstDraft": 439.6000003814697,
+        "read": 0,
+        "markdown": 5.700000286102295,
+        "editor": 16.200000286102295,
+        "draft": 5,
+        "wireBytes": 422
+      },
+      {
+        "ready": 416.2000002861023,
+        "firstInputToDraft": 10.199999809265137,
+        "navigationThroughFirstDraft": 448,
+        "read": 0,
+        "markdown": 5.5,
+        "editor": 20.5,
+        "draft": 8.199999809265137,
+        "wireBytes": 422
+      },
+      {
+        "ready": 437.80000019073486,
+        "firstInputToDraft": 7.400000095367432,
+        "navigationThroughFirstDraft": 464.7000002861023,
+        "read": 0,
+        "markdown": 6.400000095367432,
+        "editor": 15.599999904632568,
+        "draft": 5.400000095367432,
+        "wireBytes": 422
+      },
+      {
+        "ready": 436.40000009536743,
+        "firstInputToDraft": 16.800000190734863,
+        "navigationThroughFirstDraft": 472.2000002861023,
+        "read": 0,
+        "markdown": 6.199999809265137,
+        "editor": 15.400000095367432,
+        "draft": 15.099999904632568,
+        "wireBytes": 422
+      },
+      {
+        "ready": 445,
+        "firstInputToDraft": 20.40000009536743,
+        "navigationThroughFirstDraft": 494.90000009536743,
+        "read": 0,
+        "markdown": 6.300000190734863,
+        "editor": 15.199999809265137,
+        "draft": 18.59999990463257,
+        "wireBytes": 422
+      },
+      {
+        "ready": 431.40000009536743,
+        "firstInputToDraft": 16.90000009536743,
+        "navigationThroughFirstDraft": 467,
+        "read": 0,
+        "markdown": 6.200000286102295,
+        "editor": 15.700000286102295,
+        "draft": 15.099999904632568,
+        "wireBytes": 422
+      },
+      {
+        "ready": 441.40000009536743,
+        "firstInputToDraft": 6.599999904632568,
+        "navigationThroughFirstDraft": 469.7999997138977,
+        "read": 0,
+        "markdown": 6.299999713897705,
+        "editor": 15.5,
+        "draft": 4.599999904632568,
+        "wireBytes": 422
+      },
+      {
+        "ready": 429.19999980926514,
+        "firstInputToDraft": 19.700000286102295,
+        "navigationThroughFirstDraft": 469.5,
+        "read": 0,
+        "markdown": 5.800000190734863,
+        "editor": 15.099999904632568,
+        "draft": 17.90000009536743,
+        "wireBytes": 422
+      },
+      {
+        "ready": 441.7999997138977,
+        "firstInputToDraft": 16.5,
+        "navigationThroughFirstDraft": 478.3999996185303,
+        "read": 0,
+        "markdown": 6.200000286102295,
+        "editor": 15.400000095367432,
+        "draft": 14.599999904632568,
+        "wireBytes": 422
+      },
+      {
+        "ready": 431.59999990463257,
+        "firstInputToDraft": 2.6000003814697266,
+        "navigationThroughFirstDraft": 454,
+        "read": 0,
+        "markdown": 6.300000190734863,
+        "editor": 15.900000095367432,
+        "draft": 0.6000003814697266,
+        "wireBytes": 422
+      },
+      {
+        "ready": 424.69999980926514,
+        "firstInputToDraft": 19.90000009536743,
+        "navigationThroughFirstDraft": 466.69999980926514,
+        "read": 0,
+        "markdown": 6.099999904632568,
+        "editor": 14.800000190734863,
+        "draft": 18,
+        "wireBytes": 422
+      },
+      {
+        "ready": 435.7000002861023,
+        "firstInputToDraft": 16.600000381469727,
+        "navigationThroughFirstDraft": 472.2000002861023,
+        "read": 0,
+        "markdown": 6.199999809265137,
+        "editor": 16.199999809265137,
+        "draft": 14.600000381469727,
+        "wireBytes": 422
+      },
+      {
+        "ready": 436.09999990463257,
+        "firstInputToDraft": 11.599999904632568,
+        "navigationThroughFirstDraft": 466.80000019073486,
+        "read": 0,
+        "markdown": 6.400000095367432,
+        "editor": 15.799999713897705,
+        "draft": 9.700000286102295,
+        "wireBytes": 422
+      },
+      {
+        "ready": 443.40000009536743,
+        "firstInputToDraft": 2.4000000953674316,
+        "navigationThroughFirstDraft": 473.1000003814697,
+        "read": 0,
+        "markdown": 6.200000286102295,
+        "editor": 15.400000095367432,
+        "draft": 0.5,
+        "wireBytes": 422
+      },
+      {
+        "ready": 438.90000009536743,
+        "firstInputToDraft": 23.100000381469727,
+        "navigationThroughFirstDraft": 490.2000002861023,
+        "read": 0,
+        "markdown": 6.099999904632568,
+        "editor": 15.100000381469727,
+        "draft": 21.200000286102295,
+        "wireBytes": 422
+      },
+      {
+        "ready": 403.09999990463257,
+        "firstInputToDraft": 16.90000009536743,
+        "navigationThroughFirstDraft": 445.7999997138977,
+        "read": 0,
+        "markdown": 5.299999713897705,
+        "editor": 16,
+        "draft": 14.900000095367432,
+        "wireBytes": 422
+      },
+      {
+        "ready": 439.7000002861023,
+        "firstInputToDraft": 7.099999904632568,
+        "navigationThroughFirstDraft": 467.2000002861023,
+        "read": 0,
+        "markdown": 6.299999713897705,
+        "editor": 15.699999809265137,
+        "draft": 5.300000190734863,
+        "wireBytes": 422
+      },
+      {
+        "ready": 426.90000009536743,
+        "firstInputToDraft": 21.200000286102295,
+        "navigationThroughFirstDraft": 470,
+        "read": 0,
+        "markdown": 6.399999618530273,
+        "editor": 15.799999713897705,
+        "draft": 19.40000009536743,
+        "wireBytes": 422
+      },
+      {
+        "ready": 432.7000002861023,
+        "firstInputToDraft": 9,
+        "navigationThroughFirstDraft": 462.2000002861023,
+        "read": 0,
+        "markdown": 6.099999904632568,
+        "editor": 15.599999904632568,
+        "draft": 7.099999904632568,
+        "wireBytes": 422
+      },
+      {
+        "ready": 438.40000009536743,
+        "firstInputToDraft": 11.800000190734863,
+        "navigationThroughFirstDraft": 469.40000009536743,
+        "read": 0,
+        "markdown": 6.5,
+        "editor": 15.899999618530273,
+        "draft": 9.900000095367432,
+        "wireBytes": 422
+      },
+      {
+        "ready": 432.59999990463257,
+        "firstInputToDraft": 11.700000286102295,
+        "navigationThroughFirstDraft": 463.80000019073486,
+        "read": 0,
+        "markdown": 6.200000286102295,
+        "editor": 15.5,
+        "draft": 9.800000190734863,
+        "wireBytes": 422
+      },
+      {
+        "ready": 441.40000009536743,
+        "firstInputToDraft": 2.5999999046325684,
+        "navigationThroughFirstDraft": 473,
+        "read": 0,
+        "markdown": 6.099999904632568,
+        "editor": 15.199999809265137,
+        "draft": 0.5,
+        "wireBytes": 422
+      }
+    ]
+  }
+}

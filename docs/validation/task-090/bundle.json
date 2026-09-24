@@ -1,0 +1,16 @@
+{
+  "entries": [
+    {
+      "file": "index-DAsEIZrz.css",
+      "bytes": 7685,
+      "gzip": 2453
+    },
+    {
+      "file": "index-Ovv_DqIs.js",
+      "bytes": 686230,
+      "gzip": 213096
+    }
+  ],
+  "js": 213096,
+  "css": 2453
+}

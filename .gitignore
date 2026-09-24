@@ -141,3 +141,11 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Personal Memory local data and generated artifacts
+.env.*
+!.env.example
+.pmem/
+test-results/
+playwright-report/
+*.tsbuildinfo
