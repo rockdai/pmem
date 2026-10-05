@@ -10,6 +10,10 @@ try {
   const app = await createApp(settings, store);
   await app.listen({ host: settings.host, port: settings.port });
   console.log(`Personal Memory listening on port ${settings.port} (${settings.storage})`);
+  if (settings.insecureHttp)
+    console.warn(
+      `WARNING: PMEM_ALLOW_INSECURE_HTTP=1: the password and session cookie travel in plaintext over ${settings.origin}. Use only on a trusted network.`,
+    );
   let stopping = false;
   const close = async () => {
     if (stopping) return;
