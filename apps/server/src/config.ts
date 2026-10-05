@@ -4,6 +4,7 @@ export interface Config {
   passwordHash: string;
   sessionKey: Buffer;
   origin: string;
+  insecureHttp: boolean;
   storage: 'local' | 'oss';
   dataDir: string;
   stateDir: string;
@@ -34,11 +35,13 @@ export function config(env: NodeJS.ProcessEnv = process.env): Config {
   const url = new URL(required('PMEM_ORIGIN'));
   if (url.origin !== env.PMEM_ORIGIN || url.username || url.password)
     throw new Error('PMEM_ORIGIN must be an origin without a path');
-  if (
-    url.protocol !== 'https:' &&
-    !(url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))
-  )
-    throw new Error('HTTPS is required outside loopback development');
+  const http = url.protocol === 'http:';
+  const loopback = http && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  const insecureHttp = http && !loopback && env.PMEM_ALLOW_INSECURE_HTTP === '1';
+  if (url.protocol !== 'https:' && !loopback && !insecureHttp)
+    throw new Error(
+      'HTTPS is required outside loopback; set PMEM_ALLOW_INSECURE_HTTP=1 to accept plaintext HTTP on a trusted network',
+    );
   const storage = env.PMEM_STORAGE ?? 'local';
   if (storage !== 'local' && storage !== 'oss')
     throw new Error('PMEM_STORAGE must be local or oss');
@@ -49,6 +52,7 @@ export function config(env: NodeJS.ProcessEnv = process.env): Config {
     passwordHash,
     sessionKey: Buffer.from(key, 'hex'),
     origin: url.origin,
+    insecureHttp,
     storage,
     dataDir: resolve(env.PMEM_DATA_DIR ?? '.pmem/data'),
     stateDir: resolve(env.PMEM_STATE_DIR ?? '.pmem/state'),

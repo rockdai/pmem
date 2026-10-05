@@ -148,10 +148,20 @@ export class Drafts {
     await done;
   }
 }
+// crypto.randomUUID is missing on plaintext HTTP pages outside localhost.
+export const uuid = (): string =>
+  crypto.randomUUID?.() ??
+  Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte, i) =>
+    (i === 6 ? (byte & 0x0f) | 0x40 : i === 8 ? (byte & 0x3f) | 0x80 : byte)
+      .toString(16)
+      .padStart(2, '0'),
+  )
+    .join('')
+    .replace(/^(.{8})(.{4})(.{4})(.{4})/, '$1-$2-$3-$4-');
 export async function acquireSlot(namespace: string): Promise<{ id: string; release: () => void }> {
-  let id = sessionStorage.getItem(`pmem-slot:${namespace}`) ?? crypto.randomUUID();
+  let id = sessionStorage.getItem(`pmem-slot:${namespace}`) ?? uuid();
   if (!navigator.locks) {
-    id = crypto.randomUUID();
+    id = uuid();
     sessionStorage.setItem(`pmem-slot:${namespace}`, id);
     return { id, release() {} };
   }
@@ -172,7 +182,7 @@ export async function acquireSlot(namespace: string): Promise<{ id: string; rele
       sessionStorage.setItem(`pmem-slot:${namespace}`, id);
       return { id, release };
     }
-    id = crypto.randomUUID();
+    id = uuid();
   }
 }
 export async function removeOrphan(db: DraftStore, draft: Draft) {

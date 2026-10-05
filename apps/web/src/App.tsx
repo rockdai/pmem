@@ -7,7 +7,7 @@ import {
   type SessionInfo,
 } from '../../../packages/contracts/src/index';
 import { Api, HttpError } from './api';
-import { Drafts, acquireSlot, removeOrphan, type Draft, type DraftStore } from './drafts';
+import { Drafts, acquireSlot, removeOrphan, uuid, type Draft, type DraftStore } from './drafts';
 import { NoteController, type ViewState } from './controller';
 import { EditorView } from './EditorView';
 
@@ -199,7 +199,7 @@ function Workspace({
     (text = '') => {
       if (!db || !slot) return;
       sequence.current++;
-      const id = crypto.randomUUID();
+      const id = uuid();
       const draft: Draft = {
         key: `${namespace}:${slot}:${id}`,
         namespace,
@@ -433,7 +433,9 @@ function Workspace({
       }
       all.current.delete(existing);
       if (existing === current.current) newNote();
-    } else if (source.slot === slot) await db.remove(source.key, source.rev);
+    }
+    // Without Web Locks no slot can be proven idle, so only this confirmed discard removes it.
+    else if (source.slot === slot || !navigator.locks) await db.remove(source.key, source.rev);
     else await removeOrphan(db, source);
     await refreshDrafts();
   }

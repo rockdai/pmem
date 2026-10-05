@@ -16,13 +16,14 @@ afterEach(async () => {
   await Promise.all(apps.splice(0).map((a) => a.close()));
   await rm(root, { recursive: true, force: true });
 });
-async function setup(password = 'test-password-12345') {
+async function setup(password = 'test-password-12345', env: NodeJS.ProcessEnv = {}) {
   const cfg = config({
     PMEM_ACCOUNT: 'me',
     PMEM_PASSWORD_HASH: await hashPassword(password),
     PMEM_SESSION_KEY: 'ab'.repeat(32),
     PMEM_ORIGIN: 'http://localhost:3000',
     PMEM_DATA_DIR: root,
+    ...env,
   });
   const app = await createApp(cfg, await LocalStore.create(root), '/no-web');
   apps.push(app);
@@ -40,7 +41,7 @@ async function setup(password = 'test-password-12345') {
     'content-type': 'text/markdown',
   };
   expect((await app.inject({ url: '/api/v1/auth/session', headers })).statusCode).toBe(200);
-  return { app, headers, cfg };
+  return { app, headers, cfg, login };
 }
 it('stores only raw Markdown; enforces auth, CSRF and stale-write preconditions', async () => {
   const { app, headers } = await setup();
@@ -181,4 +182,46 @@ it('clearing an existing note keeps a zero-byte current file until explicit dele
   const read = await app.inject({ url, headers });
   expect(read.statusCode).toBe(200);
   expect(read.body).toBe('');
+});
+it('refuses plaintext HTTP outside loopback unless the deployer explicitly opts in', () => {
+  const env = {
+    PMEM_ACCOUNT: 'me',
+    PMEM_PASSWORD_HASH: `scrypt$${'0'.repeat(32)}$${'0'.repeat(128)}`,
+    PMEM_SESSION_KEY: 'ab'.repeat(32),
+  };
+  for (const PMEM_ORIGIN of ['http://192.168.1.10:3000', 'http://notes.lan']) {
+    expect(() => config({ ...env, PMEM_ORIGIN })).toThrow('PMEM_ALLOW_INSECURE_HTTP=1');
+    expect(() => config({ ...env, PMEM_ORIGIN, PMEM_ALLOW_INSECURE_HTTP: 'true' })).toThrow(
+      'HTTPS is required',
+    );
+    expect(config({ ...env, PMEM_ORIGIN, PMEM_ALLOW_INSECURE_HTTP: '1' }).insecureHttp).toBe(true);
+  }
+  for (const PMEM_ORIGIN of [
+    'https://notes.example.com',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://[::1]:3000',
+  ])
+    for (const PMEM_ALLOW_INSECURE_HTTP of [undefined, '1'])
+      expect(config({ ...env, PMEM_ORIGIN, PMEM_ALLOW_INSECURE_HTTP }).insecureHttp).toBe(false);
+});
+it('an opted-in HTTP origin keeps origin checks and gets a cookie browsers accept over HTTP', async () => {
+  const { app, headers, login } = await setup(undefined, {
+    PMEM_ORIGIN: 'http://notes.lan:3000',
+    PMEM_ALLOW_INSECURE_HTTP: '1',
+  });
+  const cookie = String(login.headers['set-cookie']);
+  expect(cookie).toMatch(/; HttpOnly/i);
+  expect(cookie).toMatch(/; SameSite=Strict/i);
+  expect(cookie).not.toMatch(/; Secure/i);
+  const url = `/api/v1/notes/${randomUUID()}`;
+  const foreign = { ...headers, origin: 'https://notes.lan:3000' };
+  expect(
+    (await app.inject({ method: 'POST', url, headers: foreign, payload: 'x' })).statusCode,
+  ).toBe(403);
+  expect((await app.inject({ method: 'POST', url, headers, payload: 'x' })).statusCode).toBe(201);
+});
+it('an HTTPS origin still gets a Secure cookie', async () => {
+  const { login } = await setup(undefined, { PMEM_ORIGIN: 'https://notes.example.com' });
+  expect(String(login.headers['set-cookie'])).toMatch(/; Secure/i);
 });

@@ -57,7 +57,7 @@ pnpm build
 pnpm start
 ```
 
-默认本机地址为 `http://localhost:3000`。公开访问使用 HTTPS。也可用仓库中的 Dockerfile 和 Compose 部署，本地正文卷与 OSS 模式二选一。
+默认本机地址为 `http://localhost:3000`。公开访问使用 HTTPS；可信内网可按部署说明显式开启 HTTP。也可用仓库中的 Dockerfile 和 Compose 部署，本地正文卷与 OSS 模式二选一。
 
 已实现登录、最近修改列表、Markdown 富文本编辑、自动保存、删除、本机草稿恢复和多设备冲突提示。编辑器支持标题、强调、链接、列表、任务项、引用、代码块及简单 `/` 菜单。新建空编辑区不会创建远端文件；正文只在用户编辑后保存。
 

@@ -48,7 +48,23 @@ notes.example.com {
 }
 ```
 
-Web/API 同源，不直接公开 OSS。外部 HTTP Origin 会在启动时被拒绝；本机 loopback HTTP 仅供开发。应用提供 HttpOnly、SameSite=Strict 会话 Cookie、Origin/CSRF 检查和登录限流（每个连接来源每 15 分钟 10 次）；反向代理下该额度由代理来源共享，适合单人部署。代理应允许至少 1 MiB 请求体，不缓存 `/api/`。构建产物含预压缩资源，应用按 Accept-Encoding 返回 gzip；HTML 不使用长缓存。
+Web/API 同源，不直接公开 OSS。外部 HTTP Origin 默认在启动时被拒绝，可信网络内的例外见下一节；本机 loopback HTTP 仅供开发。应用提供 HttpOnly、SameSite=Strict 会话 Cookie、Origin/CSRF 检查和登录限流（每个连接来源每 15 分钟 10 次）；反向代理下该额度由代理来源共享，适合单人部署。代理应允许至少 1 MiB 请求体，不缓存 `/api/`。构建产物含预压缩资源，应用按 Accept-Encoding 返回 gzip；HTML 不使用长缓存。
+
+## 可信网络内使用 HTTP
+
+默认只接受 HTTPS Origin。家庭内网、NAS、VPN 等链路本身可信或已加密的场景，可以由部署者显式放行明文 HTTP：
+
+```dotenv
+PMEM_ALLOW_INSECURE_HTTP=1
+PMEM_ORIGIN=http://192.168.1.10:3000
+HOST=0.0.0.0
+```
+
+- 只有取值 `1` 生效，且只影响非回环的 HTTP Origin；HTTPS 与本机 loopback 的行为不变。未设置时启动失败，错误信息会提示该开关。
+- 启动日志输出一行 `WARNING`。此时密码和会话 Cookie 以明文传输，同一网络上的其他人可以截获；不要用于公网。
+- `PMEM_ORIGIN` 必须与浏览器地址栏的协议、主机和端口完全一致，否则写入请求会被 Origin 校验拒绝。
+- 直接运行 Node 时把 `HOST` 改为内网地址或 `0.0.0.0`。Compose 示例只向宿主机回环地址发布端口，需把 `ports` 改为要监听的内网地址。
+- 浏览器把非 localhost 的 HTTP 页面视为不安全上下文，有两项功能降级。没有 Web Locks：每次加载页面分配新的草稿槽位，刷新或关闭前尚未同步的草稿需从「本机草稿」恢复；恢复后原记录不会自动回收，确认不再需要后手动丢弃，丢弃时无法判断它是否仍被另一个标签页使用。没有剪贴板接口：「复制」改为展示内容原文，供手动复制。
 
 ## OSS 初始化与权限
 
