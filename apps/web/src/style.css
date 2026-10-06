@@ -2,11 +2,12 @@
   color-scheme: light;
   --ink: #262626;
   --ink-2: #585a5a;
-  --muted: #8a8f8d;
+  --muted: #6f7573;
   --brand: #00b96b;
-  --brand-dark: #009f5c;
+  --brand-strong: #00834b;
+  --brand-deep: #00703f;
   --brand-soft: #e6f7ef;
-  --link: #1677ff;
+  --link: #0958d9;
   --bg: #ffffff;
   --side: #fafafa;
   --hover: #f2f3f3;
@@ -59,7 +60,7 @@ button:disabled {
 button:focus-visible,
 a:focus-visible,
 select:focus-visible {
-  outline: 2px solid var(--brand);
+  outline: 2px solid var(--brand-strong);
   outline-offset: 2px;
 }
 input,
@@ -74,17 +75,17 @@ textarea {
 input:focus,
 textarea:focus {
   outline: none;
-  border-color: var(--brand);
+  border-color: var(--brand-strong);
   box-shadow: 0 0 0 3px var(--brand-soft);
 }
 .primary {
-  background: var(--brand);
+  background: var(--brand-strong);
   color: #fff;
   padding: 9px 18px;
   font-weight: 500;
 }
 .primary:hover {
-  background: var(--brand-dark);
+  background: var(--brand-deep);
 }
 .muted,
 small {
@@ -453,7 +454,7 @@ small {
   flex: 1;
   min-width: 0;
 }
-.note-editor ul[data-type='taskList'] > li[data-checked='true'] > div {
+.note-editor ul[data-type='taskList'] > li[data-checked='true'] > div > p {
   color: var(--muted);
   text-decoration: line-through;
 }
@@ -503,7 +504,7 @@ small {
   padding: 8px 20px 0;
 }
 .draft-hint button {
-  color: var(--brand-dark);
+  color: var(--brand-deep);
   background: var(--brand-soft);
 }
 .welcome {
