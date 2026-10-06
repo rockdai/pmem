@@ -57,7 +57,8 @@ button:disabled {
 }
 button:focus-visible,
 a:focus-visible,
-select:focus-visible {
+select:focus-visible,
+input[type='checkbox']:focus-visible {
   outline: 2px solid var(--brand-strong);
   outline-offset: 2px;
 }
@@ -78,7 +79,7 @@ textarea:focus {
 }
 .primary {
   background: var(--brand);
-  color: #000;
+  color: #fff;
   padding: 9px 18px;
   font-weight: 500;
 }
@@ -160,7 +161,7 @@ small {
   min-height: 36px;
   font-size: 16px;
   font-weight: 600;
-  padding: 2px 8px 16px;
+  padding: 2px 0 16px;
 }
 .new-note {
   text-align: center;
@@ -240,8 +241,8 @@ small {
 }
 .note-menu {
   position: absolute;
-  right: 36px;
-  top: 6px;
+  right: 4px;
+  top: calc(50% + 16px);
   z-index: 5;
   min-width: 120px;
   padding: 4px;
@@ -346,7 +347,7 @@ small {
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   margin: 8px auto 0;
   max-width: var(--measure);
   padding: 6px calc(var(--gutter) - 8px);
@@ -372,6 +373,9 @@ small {
 }
 .toolbar select:hover {
   background: var(--hover);
+}
+.toolbar :focus-visible {
+  outline-offset: -2px;
 }
 .toolbar-spacer {
   flex: 1;
@@ -477,37 +481,27 @@ small {
   text-decoration: line-through;
 }
 .note-editor input[type='checkbox'] {
+  appearance: none;
   width: 16px;
   height: 16px;
   margin: 0;
-  accent-color: var(--brand);
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--bg) center / 12px no-repeat;
+  cursor: pointer;
+}
+.note-editor input[type='checkbox']:checked {
+  border-color: var(--brand);
+  background-color: var(--brand);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m2.5 6.5 2.5 2.5 4.5-5'/%3E%3C/svg%3E");
 }
 .editor-footer {
-  display: flex;
-  gap: 20px;
-  justify-content: space-between;
   max-width: var(--measure);
   margin: auto;
   padding: 0 var(--gutter) 32px;
   font-size: 12px;
   color: var(--muted);
-}
-.slash-menu {
-  position: absolute;
-  top: 56px;
-  left: var(--gutter);
-  padding: 6px;
-  background: var(--bg);
-  border: 1px solid var(--line);
-  box-shadow: 0 8px 24px #00000014;
-  border-radius: 8px;
-  z-index: 3;
-  display: flex;
-  flex-direction: column;
-  min-width: 168px;
-}
-.slash-menu button {
-  text-align: left;
+  text-align: right;
 }
 .notice {
   padding: 10px 20px;
@@ -676,9 +670,6 @@ small {
   }
   .welcome h1 {
     font-size: 30px;
-  }
-  .editor-footer > span:first-child {
-    display: none;
   }
   .brand .mobile-only {
     margin-left: auto;

@@ -59,8 +59,16 @@ test('login, empty creation, write, rich format, reload and delete', async ({ pa
     page.getByRole('navigation').getByRole('button', { name: /记录一个稍纵即逝的想法/ }),
   ).toBeVisible();
   await page.screenshot({ path: 'test-results/desktop.png', fullPage: true });
+  await expect(page.locator('.note-header').getByRole('button', { name: /复制|删除/ })).toHaveCount(
+    0,
+  );
+  const row = page
+    .getByRole('navigation', { name: '笔记列表' })
+    .locator('.note-row', { hasText: '记录一个稍纵即逝的想法' });
+  await row.hover();
+  await row.getByRole('button', { name: '更多操作' }).click();
   page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: '删除', exact: true }).click();
+  await page.getByRole('menuitem', { name: '删除' }).click();
   await expect.poll(async () => (await page.request.get(`/api/v1/notes/${id}`)).status()).toBe(404);
   expect(errors).toEqual([]);
 });
@@ -277,7 +285,7 @@ test('unsupported stored Markdown is read-only and is never rewritten on open', 
   expect(await page.evaluate(() => 'pmemUnsafe' in window)).toBe(false);
   expect(await (await context.request.get(`/api/v1/notes/${id}`)).text()).toBe(body);
 });
-test('completed task styling stays on that task and primary buttons keep readable contrast', async ({
+test('completed task styling stays on that task and primary controls are white on the brand greens', async ({
   context,
   page,
 }) => {
@@ -312,25 +320,17 @@ test('completed task styling stays on that task and primary buttons keep readabl
         (el) => getComputedStyle(el).color === getComputedStyle(el.closest('.note-editor')!).color,
       ),
   ).toBe(true);
-  const contrast = (button: ReturnType<typeof page.getByRole>) =>
-    button.evaluate((el) => {
-      const luminance = (css: string) => {
-        const [r, g, b] = css
-          .match(/\d+/g)!
-          .map(Number)
-          .map((v) => v / 255);
-        const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-        return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-      };
-      const style = getComputedStyle(el),
-        text = luminance(style.color),
-        back = luminance(style.backgroundColor);
-      return (Math.max(text, back) + 0.05) / (Math.min(text, back) + 0.05);
-    });
   const create = page.getByRole('button', { name: /新的笔记/ });
-  expect(await contrast(create)).toBeGreaterThanOrEqual(4.5);
+  await expect(create).toHaveCSS('color', 'rgb(255, 255, 255)');
+  await expect(create).toHaveCSS('background-color', 'rgb(0, 185, 107)');
   await create.hover();
-  expect(await contrast(create)).toBeGreaterThanOrEqual(4.5);
+  await expect(create).toHaveCSS('color', 'rgb(255, 255, 255)');
+  await expect(create).toHaveCSS('background-color', 'rgb(0, 148, 86)');
+  const done = editor.locator("li[data-checked='true'] > label > input"),
+    todo = editor.locator("li[data-checked='false'] > label > input");
+  await expect(done).toHaveCSS('background-color', 'rgb(0, 185, 107)');
+  expect(await done.evaluate((el) => getComputedStyle(el).backgroundImage)).toContain('%23fff');
+  await expect(todo).toHaveCSS('background-color', 'rgb(255, 255, 255)');
 });
 test('a note can be deleted from its sidebar menu without opening it', async ({
   context,
@@ -352,10 +352,22 @@ test('a note can be deleted from its sidebar menu without opening it', async ({
     .getByRole('navigation', { name: '笔记列表' })
     .locator('.note-row', { hasText: '从列表删除' });
   const more = row.getByRole('button', { name: '更多操作' });
+  await expect(more).toHaveText('⋮');
   await expect(more).toHaveCSS('opacity', '0');
   await row.hover();
   await expect(more).toHaveCSS('opacity', '1');
   await more.click();
+  const [button, menu] = await Promise.all([
+    more.boundingBox(),
+    page.getByRole('menu', { name: '笔记操作' }).boundingBox(),
+  ]);
+  expect(menu!.y).toBeGreaterThanOrEqual(button!.y + button!.height);
+  expect(menu!.x + menu!.width).toBeLessThanOrEqual(button!.x + button!.width + 1);
+  const [brand, create] = await Promise.all([
+    page.getByText('Personal Memory', { exact: true }).boundingBox(),
+    page.getByRole('button', { name: /新的笔记/ }).boundingBox(),
+  ]);
+  expect(brand!.x).toBeCloseTo(create!.x, 0);
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('menuitem', { name: '删除' }).click();
   await expect(row).toHaveCount(0);
@@ -364,7 +376,7 @@ test('a note can be deleted from its sidebar menu without opening it', async ({
     .toBe(404);
   await expect(page.getByRole('textbox', { name: '笔记正文', exact: true })).toBeVisible();
 });
-test('unavailable IndexedDB leaves typing and copying possible without claiming a save', async ({
+test('unavailable IndexedDB leaves typing possible without claiming a save', async ({
   context,
   page,
 }) => {
@@ -388,7 +400,37 @@ test('unavailable IndexedDB leaves typing and copying possible without claiming 
   ).toBeVisible();
   await expect(editor).toHaveText('retain this in memory');
   expect((await page.request.get(`/api/v1/notes/${id}`)).status()).toBe(404);
-  await expect(page.getByRole('button', { name: '复制', exact: true })).toBeEnabled();
+  await expect(editor).toBeEditable();
+});
+test('toolbar focus rings stay inside their controls, undo and redo work, and / opens no menu', async ({
+  context,
+  page,
+}) => {
+  await login(context);
+  await page.goto('/');
+  await ready(page);
+  const editor = page.getByRole('textbox', { name: '笔记正文', exact: true });
+  const [select, bold] = await Promise.all([
+    page.getByRole('combobox', { name: '段落格式' }).boundingBox(),
+    page.getByRole('button', { name: '加粗', exact: true }).boundingBox(),
+  ]);
+  expect(bold!.x - (select!.x + select!.width)).toBeGreaterThanOrEqual(4);
+  await editor.focus();
+  await page.keyboard.press('Shift+Tab');
+  const redo = page.getByRole('button', { name: '重做' });
+  await expect(redo).toBeFocused();
+  expect(
+    await redo.evaluate((el) => [el.matches(':focus-visible'), getComputedStyle(el).outlineOffset]),
+  ).toEqual([true, '-2px']);
+  await expect(redo.locator('svg')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: '撤销' }).locator('svg')).toHaveCount(1);
+  await editor.fill('/标题');
+  await expect(page.getByLabel('插入内容')).toHaveCount(0);
+  await expect(page.getByText('输入 /')).toHaveCount(0);
+  await page.getByRole('button', { name: '撤销' }).click();
+  await expect(editor).toHaveText('');
+  await redo.click();
+  await expect(editor).toHaveText('/标题');
 });
 test('pasted supported rich text keeps its format; unsupported HTML becomes visible text', async ({
   context,

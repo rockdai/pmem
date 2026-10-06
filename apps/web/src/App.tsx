@@ -479,15 +479,6 @@ function Workspace({
     else await removeOrphan(db, source);
     await refreshDrafts();
   }
-  const copy = async () => {
-    const text = current.current?.draft.body ?? '';
-    try {
-      await navigator.clipboard.writeText(text);
-      setError('已复制笔记内容。');
-    } catch {
-      setRemote(text);
-    }
-  };
   const title = controller?.draft.body ? noteTitle(controller.draft.body) : '新的想法';
   return (
     <div className="workspace">
@@ -524,10 +515,15 @@ function Workspace({
                 aria-expanded={menu === note.id}
                 onClick={() => setMenu(menu === note.id ? null : note.id)}
               >
-                ⋯
+                ⋮
               </button>
               {menu === note.id && (
-                <div className="note-menu" role="menu" aria-label="笔记操作">
+                <div
+                  className="note-menu"
+                  role="menu"
+                  aria-label="笔记操作"
+                  ref={(el) => el?.scrollIntoView({ block: 'nearest' })}
+                >
                   <button role="menuitem" onClick={() => void removeNote(note.id)}>
                     删除
                   </button>
@@ -582,15 +578,6 @@ function Workspace({
           <div className="breadcrumb">
             笔记本 <span>/</span> {title}
           </div>
-          <button disabled={!controller} onClick={() => void copy()}>
-            复制
-          </button>
-          <button
-            disabled={!controller || opening}
-            onClick={() => controller && void removeNote(controller.draft.id)}
-          >
-            删除
-          </button>
         </header>
         {error && (
           <div className="notice" role="alert">
@@ -653,8 +640,7 @@ function Workspace({
             </div>
             <EditorView key={controller.draft.key} controller={controller} onState={setView} />
             <footer className="editor-footer">
-              <span>输入 / 可插入标题、列表或代码块</span>
-              <span>{controller.draft.body.length.toLocaleString()} 字符</span>
+              {controller.draft.body.length.toLocaleString()} 字符
             </footer>
           </>
         )}

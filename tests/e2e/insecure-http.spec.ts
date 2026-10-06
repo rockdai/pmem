@@ -14,7 +14,7 @@ async function enter(page: Page) {
   await expect(editor).toBeVisible();
   return editor;
 }
-test('an opted-in plaintext HTTP origin supports login, writing, reload, copy and delete', async ({
+test('an opted-in plaintext HTTP origin supports login, writing, reload and delete', async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -26,24 +26,21 @@ test('an opted-in plaintext HTTP origin supports login, writing, reload, copy an
     }, `/api/v1/notes/${id}`);
   const editor = await enter(page);
   expect(
-    await page.evaluate(() => [
-      isSecureContext,
-      typeof crypto.randomUUID,
-      typeof navigator.locks,
-      typeof navigator.clipboard,
-    ]),
-  ).toEqual([false, 'undefined', 'undefined', 'undefined']);
+    await page.evaluate(() => [isSecureContext, typeof crypto.randomUUID, typeof navigator.locks]),
+  ).toEqual([false, 'undefined', 'undefined']);
   await editor.fill('内网明文访问也能记录');
   await expect(page.getByText('已同步', { exact: true })).toBeVisible();
   const id = page.url().split('/').at(-1)!;
   expect((await remote(id)).body).toContain('内网明文访问也能记录');
   await page.reload();
   await expect(editor).toContainText('内网明文访问也能记录');
-  await page.getByRole('button', { name: '复制', exact: true }).click();
-  await expect(page.getByRole('textbox', { name: '内容原文' })).toHaveValue(/内网明文访问也能记录/);
-  await page.getByRole('button', { name: '关闭原文' }).click();
+  const row = page
+    .getByRole('navigation', { name: '笔记列表' })
+    .locator('.note-row', { hasText: '内网明文访问也能记录' });
+  await row.hover();
+  await row.getByRole('button', { name: '更多操作' }).click();
   page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: '删除', exact: true }).click();
+  await page.getByRole('menuitem', { name: '删除' }).click();
   await expect.poll(async () => (await remote(id)).status).toBe(404);
   expect(errors).toEqual([]);
 });
