@@ -46,7 +46,7 @@ function Login({
   return (
     <main className="login-page">
       <form className="login-card" onSubmit={submit}>
-        <span className="logo large">m</span>
+        <div className="brand-name">Personal Memory</div>
         <h1>留住此刻的想法。</h1>
         <p className="muted">一个安静的地方，记录属于你的文字。</p>
         {message && <p role="status">{message}</p>}
@@ -144,6 +144,7 @@ function Workspace({
     [error, setError] = useState(''),
     [opening, setOpening] = useState(false);
   const [sidebar, setSidebar] = useState(false),
+    [menu, setMenu] = useState<string | null>(null),
     [drafts, setDrafts] = useState<Draft[]>([]),
     [recoverCount, setRecoverCount] = useState(5),
     [showRecovery, setShowRecovery] = useState(false),
@@ -340,6 +341,46 @@ function Workspace({
   useEffect(() => {
     if (generation) void current.current?.refresh();
   }, [generation]);
+  useEffect(() => {
+    if (!menu) return;
+    const dismiss = (event: Event) => {
+      if (
+        event instanceof KeyboardEvent
+          ? event.key === 'Escape'
+          : !(event.target as Element).closest('.note-more, .note-menu')
+      )
+        setMenu(null);
+    };
+    document.addEventListener('click', dismiss);
+    document.addEventListener('keydown', dismiss);
+    return () => {
+      document.removeEventListener('click', dismiss);
+      document.removeEventListener('keydown', dismiss);
+    };
+  }, [menu]);
+  async function removeNote(id: string) {
+    setMenu(null);
+    if (!window.confirm('删除这篇笔记？此操作没有历史版本可恢复。')) return;
+    const existing = [...all.current].find((c) => c.draft.id === id && !c.view().deleted);
+    try {
+      if (existing) {
+        if (!(await existing.remove())) {
+          setError('删除尚未完成，请先处理保存状态。');
+          return;
+        }
+        if (existing === current.current) newNote();
+      } else {
+        const etag = (await api.call(`/notes/${id}`)).headers.get('etag') ?? '';
+        await api.call(`/notes/${id}`, { method: 'DELETE', headers: { 'if-match': etag } });
+        await db?.forget(namespace, id);
+      }
+    } catch (e) {
+      if (e instanceof HttpError && e.status === 401) onExpired();
+      else setError('删除失败，请检查连接后重试。');
+    }
+    void refreshList();
+    void refreshDrafts();
+  }
   async function logout(remoteLogout = false) {
     if (
       !remoteLogout &&
@@ -452,10 +493,7 @@ function Workspace({
     <div className="workspace">
       <aside className={`sidebar ${sidebar ? 'open' : ''}`}>
         <div className="brand">
-          <span className="logo">m</span>
-          <div>
-            Personal Memory<small>我的笔记本</small>
-          </div>
+          <span>Personal Memory</span>
           <button className="mobile-only" onClick={() => setSidebar(false)} aria-label="收起列表">
             ×
           </button>
@@ -471,17 +509,31 @@ function Workspace({
         </div>
         <nav aria-label="笔记列表">
           {notes.map((note) => (
-            <button
-              className={`note-row ${controller?.draft.id === note.id ? 'selected' : ''}`}
+            <div
+              className={`note-row ${controller?.draft.id === note.id ? 'selected' : ''} ${menu === note.id ? 'menu-open' : ''}`}
               key={note.id}
-              onClick={() => void openNote(note.id)}
             >
-              <span className="note-icon">▤</span>
-              <span>
-                {note.title}
+              <button className="note-open" onClick={() => void openNote(note.id)}>
+                <span>{note.title}</span>
                 <small>{new Date(note.modified).toLocaleDateString()}</small>
-              </span>
-            </button>
+              </button>
+              <button
+                className="note-more"
+                aria-label="更多操作"
+                aria-haspopup="menu"
+                aria-expanded={menu === note.id}
+                onClick={() => setMenu(menu === note.id ? null : note.id)}
+              >
+                ⋯
+              </button>
+              {menu === note.id && (
+                <div className="note-menu" role="menu" aria-label="笔记操作">
+                  <button role="menuitem" onClick={() => void removeNote(note.id)}>
+                    删除
+                  </button>
+                </div>
+              )}
+            </div>
           ))}
           {!notes.length && (
             <p className="empty-list">
@@ -535,13 +587,7 @@ function Workspace({
           </button>
           <button
             disabled={!controller || opening}
-            onClick={() => {
-              if (controller && window.confirm('删除这篇笔记？此操作没有历史版本可恢复。'))
-                void controller.remove().then((ok) => {
-                  if (ok) newNote();
-                  else setError('删除尚未完成，请先处理保存状态。');
-                });
-            }}
+            onClick={() => controller && void removeNote(controller.draft.id)}
           >
             删除
           </button>

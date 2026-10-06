@@ -4,9 +4,7 @@
   --ink-2: #585a5a;
   --muted: #6f7573;
   --brand: #00b96b;
-  --brand-strong: #00834b;
-  --brand-deep: #00703f;
-  --brand-soft: #e6f7ef;
+  --brand-strong: #009456;
   --link: #0958d9;
   --bg: #ffffff;
   --side: #fafafa;
@@ -76,39 +74,24 @@ input:focus,
 textarea:focus {
   outline: none;
   border-color: var(--brand-strong);
-  box-shadow: 0 0 0 3px var(--brand-soft);
+  box-shadow: 0 0 0 3px #00b96b33;
 }
 .primary {
-  background: var(--brand-strong);
-  color: #fff;
+  background: var(--brand);
+  color: #000;
   padding: 9px 18px;
   font-weight: 500;
 }
 .primary:hover {
-  background: var(--brand-deep);
+  background: var(--brand-strong);
 }
 .muted,
 small {
   color: var(--muted);
 }
-.logo {
-  display: inline-grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: var(--brand);
-  color: #fff;
-  font-weight: 700;
-  font-size: 17px;
-  line-height: 1;
-  flex-shrink: 0;
-}
-.logo.large {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  font-size: 28px;
+.brand-name {
+  font-size: 18px;
+  font-weight: 600;
 }
 .login-page {
   min-height: 100dvh;
@@ -123,7 +106,7 @@ small {
   font-size: 32px;
   font-weight: 700;
   line-height: 1.3;
-  margin: 28px 0 8px;
+  margin: 20px 0 8px;
 }
 .login-card > p {
   margin: 0 0 8px;
@@ -173,17 +156,11 @@ small {
 }
 .brand {
   display: flex;
-  gap: 10px;
   align-items: center;
-  font-size: 15px;
+  min-height: 36px;
+  font-size: 16px;
   font-weight: 600;
-  padding: 4px 8px 20px;
-}
-.brand small {
-  display: block;
-  font-size: 12px;
-  font-weight: 400;
-  margin-top: 1px;
+  padding: 2px 8px 16px;
 }
 .new-note {
   text-align: center;
@@ -207,33 +184,75 @@ small {
   flex: 1;
 }
 .note-row {
-  width: 100%;
+  position: relative;
   display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  text-align: left;
-  padding: 7px 8px;
+  align-items: center;
   margin-bottom: 2px;
-  color: var(--ink);
+  border-radius: var(--radius);
 }
-.note-row > span:last-child {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.note-row small {
-  display: block;
-  font-size: 12px;
-  margin-top: 1px;
+.note-row:hover,
+.note-row.menu-open {
+  background: var(--hover);
 }
 .note-row.selected {
   background: var(--active);
 }
-.note-icon {
+.note-open {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  padding: 7px 8px;
+}
+.note-open:hover {
+  background: transparent;
+}
+.note-open > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.note-open small {
+  display: block;
+  font-size: 12px;
+  margin-top: 1px;
+}
+.note-more {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  margin-right: 4px;
   color: var(--muted);
-  font-size: 14px;
-  line-height: 20px;
+  font-size: 18px;
+  line-height: 1;
+  opacity: 0;
+}
+.note-row:hover .note-more,
+.note-row.menu-open .note-more,
+.note-more:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .note-more {
+    opacity: 1;
+  }
+}
+.note-menu {
+  position: absolute;
+  right: 36px;
+  top: 6px;
+  z-index: 5;
+  min-width: 120px;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px #00000014;
+}
+.note-menu button {
+  width: 100%;
+  text-align: left;
 }
 .empty-list {
   color: var(--muted);
@@ -369,7 +388,6 @@ small {
   line-height: 1.75;
   font-size: 16px;
   overflow-wrap: anywhere;
-  caret-color: var(--brand);
 }
 .note-editor p {
   margin: 0 0 12px;
@@ -504,8 +522,8 @@ small {
   padding: 8px 20px 0;
 }
 .draft-hint button {
-  color: var(--brand-deep);
-  background: var(--brand-soft);
+  color: var(--ink);
+  background: #00b96b1a;
 }
 .welcome {
   margin: 18dvh auto 0;

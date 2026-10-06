@@ -293,8 +293,9 @@ test('completed task styling stays on that task and primary buttons keep readabl
   });
   await page.goto(`/#/note/${id}`);
   await ready(page);
+  const editor = page.getByRole('textbox', { name: '笔记正文', exact: true });
   const struck = (text: string) =>
-    page.getByText(text, { exact: true }).evaluate((el) => {
+    editor.getByText(text, { exact: true }).evaluate((el) => {
       let node: Element | null = el;
       while (node && !node.classList.contains('note-editor')) {
         if (getComputedStyle(node).textDecorationLine.includes('line-through')) return true;
@@ -305,7 +306,7 @@ test('completed task styling stays on that task and primary buttons keep readabl
   await expect.poll(() => struck('已完成父项')).toBe(true);
   expect(await struck('未完成子项')).toBe(false);
   expect(
-    await page
+    await editor
       .getByText('未完成子项', { exact: true })
       .evaluate(
         (el) => getComputedStyle(el).color === getComputedStyle(el.closest('.note-editor')!).color,
@@ -330,6 +331,38 @@ test('completed task styling stays on that task and primary buttons keep readabl
   expect(await contrast(create)).toBeGreaterThanOrEqual(4.5);
   await create.hover();
   expect(await contrast(create)).toBeGreaterThanOrEqual(4.5);
+});
+test('a note can be deleted from its sidebar menu without opening it', async ({
+  context,
+  page,
+}) => {
+  const session = await login(context),
+    id = crypto.randomUUID();
+  await context.request.post(`/api/v1/notes/${id}`, {
+    headers: {
+      origin: 'http://127.0.0.1:4173',
+      'x-csrf-token': session.csrf,
+      'content-type': 'text/markdown',
+    },
+    data: '# 从列表删除',
+  });
+  await page.goto('/');
+  await ready(page);
+  const row = page
+    .getByRole('navigation', { name: '笔记列表' })
+    .locator('.note-row', { hasText: '从列表删除' });
+  const more = row.getByRole('button', { name: '更多操作' });
+  await expect(more).toHaveCSS('opacity', '0');
+  await row.hover();
+  await expect(more).toHaveCSS('opacity', '1');
+  await more.click();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('menuitem', { name: '删除' }).click();
+  await expect(row).toHaveCount(0);
+  await expect
+    .poll(async () => (await context.request.get(`/api/v1/notes/${id}`)).status())
+    .toBe(404);
+  await expect(page.getByRole('textbox', { name: '笔记正文', exact: true })).toBeVisible();
 });
 test('unavailable IndexedDB leaves typing and copying possible without claiming a save', async ({
   context,
