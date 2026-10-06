@@ -46,8 +46,7 @@ function Login({
   return (
     <main className="login-page">
       <form className="login-card" onSubmit={submit}>
-        <div className="brand-mark">m.</div>
-        <p className="eyebrow">PERSONAL MEMORY</p>
+        <span className="logo large">m</span>
         <h1>留住此刻的想法。</h1>
         <p className="muted">一个安静的地方，记录属于你的文字。</p>
         {message && <p role="status">{message}</p>}
@@ -65,7 +64,7 @@ function Login({
           </p>
         )}
         <button className="primary" disabled={busy}>
-          {busy ? '正在登录…' : '进入笔记本 →'}
+          {busy ? '正在登录…' : '进入笔记本'}
         </button>
         <small>你的笔记，保存在你自己的服务中。</small>
       </form>
@@ -453,7 +452,7 @@ function Workspace({
     <div className="workspace">
       <aside className={`sidebar ${sidebar ? 'open' : ''}`}>
         <div className="brand">
-          <span className="brand-mark small">m.</span>
+          <span className="logo">m</span>
           <div>
             Personal Memory<small>我的笔记本</small>
           </div>
@@ -462,7 +461,7 @@ function Workspace({
           </button>
         </div>
         <button className="primary new-note" disabled={!db} onClick={() => newNote()}>
-          ＋ 新的笔记 <kbd>想到了，就记下</kbd>
+          ＋ 新的笔记
         </button>
         <div className="list-heading">
           <span>最近修改</span>
@@ -562,7 +561,7 @@ function Workspace({
         )}
         {drafts.some((d) => d.slot !== slot) && (
           <div className="draft-hint">
-            <button onClick={() => setShowRecovery(true)}>有未同步的本机草稿，查看并恢复 →</button>
+            <button onClick={() => setShowRecovery(true)}>有未同步的本机草稿，查看并恢复</button>
           </div>
         )}
         {controller && (
@@ -608,14 +607,13 @@ function Workspace({
             </div>
             <EditorView key={controller.draft.key} controller={controller} onState={setView} />
             <footer className="editor-footer">
-              <span>文字留在这里，思绪继续向前。</span>
-              <span>{controller.draft.body.length.toLocaleString()} 字符 · 输入 / 插入内容</span>
+              <span>输入 / 可插入标题、列表或代码块</span>
+              <span>{controller.draft.body.length.toLocaleString()} 字符</span>
             </footer>
           </>
         )}
         {!controller && !opening && (
           <div className="welcome">
-            <p className="eyebrow">A SPACE FOR YOUR THOUGHTS</p>
             <h1>从此刻，开始记录。</h1>
             <p>选择一篇笔记，或捕捉一个新的想法。</p>
             <button className="primary" onClick={() => newNote()} disabled={!db}>

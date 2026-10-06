@@ -277,6 +277,60 @@ test('unsupported stored Markdown is read-only and is never rewritten on open', 
   expect(await page.evaluate(() => 'pmemUnsafe' in window)).toBe(false);
   expect(await (await context.request.get(`/api/v1/notes/${id}`)).text()).toBe(body);
 });
+test('completed task styling stays on that task and primary buttons keep readable contrast', async ({
+  context,
+  page,
+}) => {
+  const session = await login(context),
+    id = crypto.randomUUID();
+  await context.request.post(`/api/v1/notes/${id}`, {
+    headers: {
+      origin: 'http://127.0.0.1:4173',
+      'x-csrf-token': session.csrf,
+      'content-type': 'text/markdown',
+    },
+    data: '- [x] 已完成父项\n  - [ ] 未完成子项',
+  });
+  await page.goto(`/#/note/${id}`);
+  await ready(page);
+  const struck = (text: string) =>
+    page.getByText(text, { exact: true }).evaluate((el) => {
+      let node: Element | null = el;
+      while (node && !node.classList.contains('note-editor')) {
+        if (getComputedStyle(node).textDecorationLine.includes('line-through')) return true;
+        node = node.parentElement;
+      }
+      return false;
+    });
+  await expect.poll(() => struck('已完成父项')).toBe(true);
+  expect(await struck('未完成子项')).toBe(false);
+  expect(
+    await page
+      .getByText('未完成子项', { exact: true })
+      .evaluate(
+        (el) => getComputedStyle(el).color === getComputedStyle(el.closest('.note-editor')!).color,
+      ),
+  ).toBe(true);
+  const contrast = (button: ReturnType<typeof page.getByRole>) =>
+    button.evaluate((el) => {
+      const luminance = (css: string) => {
+        const [r, g, b] = css
+          .match(/\d+/g)!
+          .map(Number)
+          .map((v) => v / 255);
+        const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+        return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+      };
+      const style = getComputedStyle(el),
+        text = luminance(style.color),
+        back = luminance(style.backgroundColor);
+      return (Math.max(text, back) + 0.05) / (Math.min(text, back) + 0.05);
+    });
+  const create = page.getByRole('button', { name: /新的笔记/ });
+  expect(await contrast(create)).toBeGreaterThanOrEqual(4.5);
+  await create.hover();
+  expect(await contrast(create)).toBeGreaterThanOrEqual(4.5);
+});
 test('unavailable IndexedDB leaves typing and copying possible without claiming a save', async ({
   context,
   page,
