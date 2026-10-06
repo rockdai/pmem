@@ -22,8 +22,7 @@ export function EditorView({
 }) {
   const host = useRef<HTMLDivElement>(null),
     editor = useRef<Editor | null>(null);
-  const [raw, setRaw] = useState<string | null>(null),
-    [slash, setSlash] = useState(false);
+  const [raw, setRaw] = useState<string | null>(null);
   const onStateRef = useRef(onState);
   onStateRef.current = onState;
   useEffect(() => {
@@ -55,13 +54,6 @@ export function EditorView({
       performance.measure('pmem:markdown', { start, end: performance.now() });
     };
     display(seen);
-    const updateMenu = () =>
-      setSlash(
-        !instance.view.composing &&
-          /^\/[^\s]*$/.test(instance.state.selection.$from.parent.textContent),
-      );
-    instance.on('selectionUpdate', updateMenu);
-    instance.on('update', updateMenu);
     controller.onView = (state) => {
       if (state.body !== seen && !instance.view.composing) {
         seen = state.body;
@@ -144,18 +136,22 @@ export function EditorView({
         </button>
         <span className="toolbar-spacer" />
         <button
+          title="撤销 Ctrl/⌘ Z"
           aria-label="撤销"
           disabled={raw !== null}
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => run((e) => e.chain().focus().undo().run())}
         >
-          ↶
+          <HistoryIcon />
         </button>
         <button
+          title="重做 Ctrl/⌘ ⇧ Z"
           aria-label="重做"
           disabled={raw !== null}
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => run((e) => e.chain().focus().redo().run())}
         >
-          ↷
+          <HistoryIcon redo />
         </button>
       </div>
       {raw !== null && (
@@ -166,27 +162,26 @@ export function EditorView({
       )}
       <div className={raw !== null ? 'hidden' : 'editor-page'}>
         <div ref={host} />
-        {slash && (
-          <div className="slash-menu" aria-label="插入内容">
-            {actions.map(([label, action]) => (
-              <button
-                key={label}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() =>
-                  run((e) => {
-                    const at = e.state.selection.$from;
-                    e.commands.deleteRange({ from: at.start(), to: at.pos });
-                    action(e);
-                    setSlash(false);
-                  })
-                }
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
     </>
+  );
+}
+function HistoryIcon({ redo = false }: { redo?: boolean }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="18"
+      height="18"
+      viewBox="0 0 18 18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={redo ? { transform: 'scaleX(-1)' } : undefined}
+    >
+      <path d="M3 7h8.5a3.5 3.5 0 0 1 0 7H8" />
+      <path d="m6 4-3 3 3 3" />
+    </svg>
   );
 }
