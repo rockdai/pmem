@@ -2,7 +2,22 @@ import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
 export default defineConfig({
   root: fileURLToPath(new URL('.', import.meta.url)),
-  build: { outDir: '../../dist/web', emptyOutDir: true, target: 'es2022', manifest: true },
+  build: {
+    outDir: '../../dist/web',
+    emptyOutDir: true,
+    target: 'es2022',
+    manifest: true,
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            { name: 'react', test: /node_modules\/(react|react-dom|scheduler)\// },
+            { name: 'editor', test: /node_modules\/(@tiptap|prosemirror-|marked|linkifyjs)/ },
+          ],
+        },
+      },
+    },
+  },
   server: {
     host: '127.0.0.1',
     port: 5173,
