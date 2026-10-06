@@ -11,13 +11,19 @@ for (const file of await readdir('dist/web/assets')) {
 }
 const total = (suffix) =>
   entries.filter((e) => e.file.endsWith(suffix)).reduce((n, e) => n + e.gzip, 0);
+const scripts = entries.filter((e) => e.file.endsWith('.js')),
+  largest = Math.max(...scripts.map((e) => e.bytes)),
+  html = await readFile('dist/web/index.html', 'utf8'),
+  unlinked = scripts.filter((e) => !html.includes(`/assets/${e.file}`)).map((e) => e.file);
 console.table(entries);
 console.log(
-  `All JS: ${total('.js')} / ${250 * 1024} gzip bytes; all CSS: ${total('.css')} / ${30 * 1024}`,
+  `All JS: ${total('.js')} / ${250 * 1024} gzip bytes; all CSS: ${total('.css')} / ${30 * 1024}; largest JS chunk: ${largest} / 500000 bytes`,
 );
+if (unlinked.length) console.log(`JS chunks index.html neither loads nor preloads: ${unlinked}`);
 await mkdir('dist/reports', { recursive: true });
 await writeFile(
   'dist/reports/bundle.json',
-  JSON.stringify({ entries, js: total('.js'), css: total('.css') }, null, 2),
+  JSON.stringify({ entries, js: total('.js'), css: total('.css'), largest }, null, 2),
 );
-if (total('.js') > 250 * 1024 || total('.css') > 30 * 1024) process.exitCode = 1;
+if (total('.js') > 250 * 1024 || total('.css') > 30 * 1024 || largest > 500000 || unlinked.length)
+  process.exitCode = 1;
