@@ -77,13 +77,13 @@ textarea:focus {
   box-shadow: 0 0 0 3px #00b96b33;
 }
 .primary {
-  background: var(--brand-strong);
-  color: #fff;
+  background: var(--brand);
+  color: #000;
   padding: 9px 18px;
   font-weight: 500;
 }
 .primary:hover {
-  background: var(--brand);
+  background: var(--brand-strong);
 }
 .muted,
 small {
@@ -522,7 +522,7 @@ small {
   padding: 8px 20px 0;
 }
 .draft-hint button {
-  color: var(--brand-strong);
+  color: var(--ink);
   background: #00b96b1a;
 }
 .welcome {

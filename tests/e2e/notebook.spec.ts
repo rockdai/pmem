@@ -327,8 +327,10 @@ test('completed task styling stays on that task and primary buttons keep readabl
         back = luminance(style.backgroundColor);
       return (Math.max(text, back) + 0.05) / (Math.min(text, back) + 0.05);
     });
-  // Palette is fixed to #00b96b / #009456; white on #009456 is 3.9:1, so the bar is WCAG's 3:1.
-  expect(await contrast(page.getByRole('button', { name: /新的笔记/ }))).toBeGreaterThanOrEqual(3);
+  const create = page.getByRole('button', { name: /新的笔记/ });
+  expect(await contrast(create)).toBeGreaterThanOrEqual(4.5);
+  await create.hover();
+  expect(await contrast(create)).toBeGreaterThanOrEqual(4.5);
 });
 test('a note can be deleted from its sidebar menu without opening it', async ({
   context,
