@@ -72,6 +72,95 @@ test('login, empty creation, write, rich format, reload and delete', async ({ pa
   await expect.poll(async () => (await page.request.get(`/api/v1/notes/${id}`)).status()).toBe(404);
   expect(errors).toEqual([]);
 });
+for (const modifier of ['Control', 'Meta']) {
+  test(`${modifier}+S syncs the current note immediately from the editor or toolbar`, async ({
+    context,
+    page,
+  }) => {
+    await login(context);
+    await page.clock.install({ time: Date.now() - 60_000 });
+    await page.goto('/');
+    await ready(page);
+    await page.clock.pauseAt(Date.now());
+    const editor = page.getByRole('textbox', { name: '笔记正文', exact: true });
+    const id = page.url().split('/').at(-1)!;
+    const writes: string[] = [];
+    page.on('request', (request) => {
+      if (request.url().endsWith(`/notes/${id}`) && ['POST', 'PUT'].includes(request.method()))
+        writes.push(request.method());
+    });
+    expect(
+      await editor.evaluate((element, modifier) => {
+        const event = new KeyboardEvent('keydown', {
+          key: 's',
+          ctrlKey: modifier === 'Control',
+          metaKey: modifier === 'Meta',
+          bubbles: true,
+          cancelable: true,
+        });
+        element.dispatchEvent(event);
+        return event.defaultPrevented;
+      }, modifier),
+    ).toBe(true);
+    expect((await page.request.get(`/api/v1/notes/${id}`)).status()).toBe(404);
+    await editor.fill('快捷键立即同步');
+    await expect(page.getByText('已保存到本机，待同步', { exact: true })).toBeVisible();
+    expect(writes).toEqual([]);
+    await editor.press(`${modifier}+s`);
+    await expect(page.getByText('已同步', { exact: true })).toBeVisible();
+    expect(await (await page.request.get(`/api/v1/notes/${id}`)).text()).toBe('快捷键立即同步');
+    await editor.press(`${modifier}+s`);
+    await page.clock.runFor(2000);
+    expect(writes).toEqual(['POST']);
+    await editor.fill('工具栏聚焦时也能同步');
+    await expect(page.getByText('已保存到本机，待同步', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '加粗', exact: true }).focus();
+    await page.keyboard.press(`${modifier}+s`);
+    await expect(page.getByText('已同步', { exact: true })).toBeVisible();
+    expect(await (await page.request.get(`/api/v1/notes/${id}`)).text()).toBe('工具栏聚焦时也能同步');
+    expect(writes).toEqual(['POST', 'PUT']);
+  });
+}
+test('save shortcuts leave other keys and composition alone and follow the selected note', async ({
+  context,
+  page,
+}) => {
+  await login(context);
+  await page.clock.install({ time: Date.now() - 60_000 });
+  await page.goto('/');
+  await ready(page);
+  await page.clock.pauseAt(Date.now());
+  const editor = page.getByRole('textbox', { name: '笔记正文', exact: true });
+  await editor.fill('第一篇快捷键笔记');
+  await editor.press('ControlOrMeta+s');
+  await expect(page.getByText('已同步', { exact: true })).toBeVisible();
+  const firstId = page.url().split('/').at(-1)!;
+  await page.getByRole('button', { name: /新的笔记/ }).click();
+  await editor.fill('第二篇快捷键笔记');
+  await expect(page.getByText('已保存到本机，待同步', { exact: true })).toBeVisible();
+  const secondId = page.url().split('/').at(-1)!;
+  for (const init of [
+    { key: 's' },
+    { key: 'b', ctrlKey: true },
+    { key: 's', ctrlKey: true, shiftKey: true },
+    { key: 's', metaKey: true, altKey: true },
+    { key: 's', ctrlKey: true, isComposing: true },
+    { key: 's', metaKey: true, repeat: true },
+  ]) {
+    expect(
+      await page.evaluate((init) => {
+        const event = new KeyboardEvent('keydown', { ...init, bubbles: true, cancelable: true });
+        document.body.dispatchEvent(event);
+        return event.defaultPrevented;
+      }, init),
+    ).toBe(Boolean(init.isComposing || init.repeat));
+    expect((await page.request.get(`/api/v1/notes/${secondId}`)).status()).toBe(404);
+  }
+  await editor.press('ControlOrMeta+s');
+  await expect(page.getByText('已同步', { exact: true })).toBeVisible();
+  expect(await (await page.request.get(`/api/v1/notes/${firstId}`)).text()).toBe('第一篇快捷键笔记');
+  expect(await (await page.request.get(`/api/v1/notes/${secondId}`)).text()).toBe('第二篇快捷键笔记');
+});
 test('a late acknowledgment never overwrites typing and survives refresh', async ({
   context,
   page,
@@ -96,8 +185,10 @@ test('a late acknowledgment never overwrites typing and survives refresh', async
   });
   const editor = page.getByRole('textbox', { name: '笔记正文', exact: true });
   await editor.fill('first');
+  await editor.press('ControlOrMeta+s');
   await arrived;
   await editor.fill('first plus newer input');
+  await editor.press('ControlOrMeta+s');
   release();
   await expect(page.getByText('已同步', { exact: true })).toBeVisible();
   await expect(editor).toHaveText('first plus newer input');

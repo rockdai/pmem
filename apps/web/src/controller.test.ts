@@ -49,6 +49,26 @@ async function spin(check: () => boolean) {
   for (let i = 0; i < 1000 && !check(); i++) await new Promise((resolve) => setImmediate(resolve));
   expect(check()).toBe(true);
 }
+it.each([null, '"previous"'])(
+  'manual saving persists and syncs before debounce with base %s',
+  async (base) => {
+    const fetcher = vi.fn(
+      async () => new Response(null, { status: 200, headers: { etag: '"saved"' } }),
+    );
+    const { c, db } = await make(fetcher, base);
+    c.change('立即保存的文字', true);
+    await c.save();
+    expect(fetcher).toHaveBeenCalledWith(
+      `/api/v1/notes/${c.draft.id}`,
+      expect.objectContaining({ method: base ? 'PUT' : 'POST', body: '立即保存的文字' }),
+    );
+    expect((await db.cached('test', c.draft.id))?.body).toBe('立即保存的文字');
+    expect(c.view().status).toBe('已同步');
+    await c.save();
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(fetcher).toHaveBeenCalledOnce();
+  },
+);
 it('late save acknowledgment preserves and persists a newer draft with the new baseline', async () => {
   let finish!: (r: Response) => void,
     calls = 0;
@@ -64,6 +84,8 @@ it('late save acknowledgment preserves and persists a newer draft with the new b
   await spin(() => calls === 1);
   c.change('new input', true);
   await c.durable();
+  await c.save();
+  expect(calls).toBe(1);
   finish(new Response(null, { status: 201, headers: { etag: '"first"' } }));
   await saving;
   expect(c.view().body).toBe('new input');

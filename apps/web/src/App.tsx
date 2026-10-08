@@ -342,6 +342,21 @@ function Workspace({
     if (generation) void current.current?.refresh();
   }, [generation]);
   useEffect(() => {
+    const save = (event: KeyboardEvent) => {
+      if (
+        !(event.metaKey || event.ctrlKey) ||
+        event.key.toLowerCase() !== 's' ||
+        event.altKey ||
+        event.shiftKey
+      )
+        return;
+      event.preventDefault();
+      if (!event.repeat && !event.isComposing) void current.current?.save();
+    };
+    window.addEventListener('keydown', save);
+    return () => window.removeEventListener('keydown', save);
+  }, []);
+  useEffect(() => {
     if (!menu) return;
     const dismiss = (event: Event) => {
       if (
