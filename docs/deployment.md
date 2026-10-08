@@ -1,46 +1,87 @@
 # 自托管部署
 
-运行基线为 Node.js 24、pnpm 10.32.1。一个部署只有一个账号和一个活动服务进程；多台设备通过同一 Web 地址使用。不要运行多个副本、PM2 cluster 或让外部程序同时修改数据目录 / OSS 前缀。每篇笔记最多 1 MiB UTF-8 Markdown。没有数据库、搜索、索引、备份、回收站或历史版本。
+运行基线为 Node.js 24；源码开发另需 pnpm 10.32.1。一个部署只有一个账号和一个活动服务进程；多台设备通过同一 Web 地址使用。不要运行多个副本、PM2 cluster 或让外部程序同时修改数据目录 / OSS 前缀。每篇笔记最多 1 MiB UTF-8 Markdown。没有数据库、搜索、索引、备份、回收站或历史版本。
 
-## 本机启动
+## npm 安装与配置
 
 ```bash
-corepack enable
-pnpm install --frozen-lockfile
-cp .env.example .env
-chmod 600 .env
-pnpm --silent setup key
-# 以下密码输入命令在 Bash 中执行，不把密码放进命令历史或参数：
+npm install -g pmem
+mkdir -p ~/.pmem
+cp "$(npm root -g)/pmem/pmem.example.json" ~/.pmem/pmem.json
+chmod 600 ~/.pmem/pmem.json
+pmem key
+# 以下密码输入命令在 Bash 中执行：
 read -r -s -p 'Password (12+ characters): ' pmem_password
-printf '%s' "$pmem_password" | pnpm --silent setup hash-password
+printf '%s' "$pmem_password" | pmem hash-password
 unset pmem_password
 ```
 
-将两条命令的结果分别填入 `.env` 的 `PMEM_SESSION_KEY`、`PMEM_PASSWORD_HASH`；不要加引号，保留哈希中的 `$`。填写个人账号和准确的 `PMEM_ORIGIN`（无末尾 `/`）。`.env` 不要提交到 Git，不要复制到镜像。密码哈希或账号变更后重启，旧 Cookie 会失效；更换会话密钥也会失效，并改变浏览器草稿的部署命名空间，操作前先同步或复制草稿。
+将两条命令的结果分别填入 `sessionKey`、`passwordHash`，并填写 `account`。配置文件使用标准 JSON，例如：
 
-```bash
-pnpm build
-pnpm start
+```json
+{
+  "account": "me",
+  "passwordHash": "粘贴 pmem hash-password 的结果",
+  "sessionKey": "粘贴 pmem key 的结果",
+  "origin": "http://localhost:3000",
+  "host": "127.0.0.1",
+  "port": 3000,
+  "storage": "local",
+  "dataDir": "data",
+  "stateDir": "state",
+  "allowInsecureHttp": false
+}
 ```
 
-访问 `http://localhost:3000`。本地正文在 `.pmem/data/notes/<UUID>.md`；只有内容与 Markdown 格式，没有页面 HTML 或 JSON 外壳。`PMEM_DATA_DIR` 可指定专用目录，操作系统用户必须有创建、替换、删除及 fsync 权限。不要通过符号链接提供 notes 目录。推荐本机 SSD 文件系统，不承诺网络文件系统的原子发布语义。
+| 字段 | 默认值或要求 |
+| --- | --- |
+| `account` | 必填，个人登录账号 |
+| `passwordHash` | 必填，使用 `pmem hash-password` 生成，密码至少 12 字符 |
+| `sessionKey` | 必填，使用 `pmem key` 生成的 64 位十六进制字符串 |
+| `origin` | `http://localhost:<port>`；必须与浏览器地址完全一致，不带路径及末尾 `/` |
+| `host` / `port` | `127.0.0.1` / `3000`；端口为 JSON 整数 |
+| `storage` | `local`，可选 `oss` |
+| `dataDir` / `stateDir` | 配置文件旁的 `data` / `state`，支持绝对路径、相对路径和 `~/` |
+| `allowInsecureHttp` | `false`；可信内网明文 HTTP 必须显式设为布尔值 `true` |
+| `oss` | OSS 模式必填，包含 `bucket`、`region`、`prefix`、`accessKeyId`、`accessKeySecret` |
 
-开发 Web 时，另开终端运行 `pnpm dev:web`，并将 `.env` 的 `PMEM_ORIGIN` 改为 `http://localhost:5173`，服务端运行 `pnpm dev`。Vite 代理 API；性能测试必须使用正式构建。
+配置默认地址为 `~/.pmem/pmem.json`，`-c` 可指定其他文件。**不再读取 `.env` 和旧的应用配置环境变量**；容器镜像内部的 `PMEM_CONTAINER=1` 仅用于启用持久挂载检查。未知字段、无效类型和非法值会在启动时被拒绝。配置缺失不会自动生成账号或密码。
+
+配置文件不要提交到 Git，不要复制到镜像。修改配置后重启生效。密码哈希或账号变更会使旧 Cookie 失效；更换会话密钥也会失效，并改变浏览器草稿的部署命名空间，操作前先同步或复制草稿。
+
+从旧版本迁移时，将原 `.env` 的账号、哈希、密钥、Origin、存储参数移入对应 JSON 字段；`PMEM_ALLOW_INSECURE_HTTP=1` 改为 `"allowInsecureHttp": true`，OSS 参数放入 `oss` 对象。将旧 `PMEM_DATA_DIR` / `PMEM_STATE_DIR` 转为原目录的**绝对路径**填入 `dataDir` / `stateDir`，避免默认目录改变后误以为笔记丢失。
+
+## 前台与后台运行
+
+```bash
+pmem start
+pmem start -d
+pmem start -d -c /path/to/pmem.json
+pmem stop
+```
+
+每个系统用户只运行一个服务。前台用 Ctrl+C 停止；后台关闭终端后继续运行，使用 `pmem stop` 停止，且停止时不需要原配置文件。后台日志为 `~/.pmem/pmem.log`，服务记录为 `~/.pmem/pmem.pid`。启动命令在服务真正开始监听后才报告成功。异常退出留下的记录可用 `pmem stop` 清理，再重新启动。停止命令通过带随机凭据的本机控制连接请求服务关闭，不会仅凭 PID 发送信号。
+
+daemon 不提供自动重启或开机启动；需要时用系统服务管理器运行前台 `pmem start`，或使用下方 Docker 的重启策略。
+
+访问 `http://localhost:3000`。默认本地正文在 `~/.pmem/data/notes/<UUID>.md`；只有 Markdown 内容，没有页面 HTML 或 JSON 外壳。`dataDir` 可指定专用目录，操作系统用户必须有创建、替换、删除及 fsync 权限。不要通过符号链接提供 notes 目录。推荐本机 SSD 文件系统，不承诺网络文件系统的原子发布语义。
+
+源码开发：`corepack enable`、`pnpm install --frozen-lockfile`、`pnpm build`，再 `pnpm start`。开发 Web 时另开终端运行 `pnpm dev:web`，把 JSON 的 `origin` 改为 `http://localhost:5173`，服务端运行 `pnpm dev`。配置参数可以追加到启动命令，例如 `pnpm start -c /path/to/pmem.json`。
 
 ## 容器：本地与 OSS 二选一
 
-需要 Docker 和 Compose 2.30 或以上；`env_file: format: raw` 用于避免密码哈希的 `$` 被展开。镜像以 UID/GID 1000 的 `node` 用户运行，监听容器 3000 端口。示例仅向宿主机回环地址发布端口。
+需要 Docker 和 Compose。镜像以 UID/GID 1000 的 `node` 用户运行。将 `pmem.example.json` 复制为 Compose 同目录的 `pmem.json`，填好账号、哈希和密钥，并设置 `host` 为 `0.0.0.0`、`port` 为 `3000`、`dataDir` 为 `/data`、`stateDir` 为 `/state`。配置以只读文件挂载到 `/config/pmem.json`；宿主机文件须允许 UID 1000 读取（例如更改属主为 1000 后设为 600）。不要放宽为全局可读。
 
-准备 `.env` 后，本地模式：
+`storage` 为 `local` 时：
 
 ```bash
 docker compose --profile local up -d --build
 docker compose --profile local logs --tail 30
 ```
 
-Compose 将专用 `notes` 命名卷挂在 `/data`；OSS 服务使用另一个 `state` 命名卷挂在 `/state`。不要同时启用两个 profile，不要扩容服务，也不要执行会删除数据卷的清理命令。使用宿主机 bind mount 时预先创建目录并赋予 UID 1000 读写权限。
+OSS 模式改为 `"storage": "oss"` 并填写 `oss` 参数，使用 `oss` profile。Compose 将专用 `notes` 命名卷挂在 `/data`；OSS 服务使用另一个 `state` 命名卷挂在 `/state`。不要同时启用两个 profile，不要扩容服务，也不要执行会删除数据卷的清理命令。使用宿主机 bind mount 时预先创建目录并赋予 UID 1000 读写权限。示例只向宿主机回环地址发布端口。
 
-公开访问必须配置 HTTPS 和 `PMEM_ORIGIN=https://你的域名`。例如宿主机 Caddy：
+公开访问必须配置 HTTPS 和 ``origin` 为 `https://你的域名``。例如宿主机 Caddy：
 
 ```caddyfile
 notes.example.com {
@@ -54,21 +95,37 @@ Web/API 同源，不直接公开 OSS。外部 HTTP Origin 默认在启动时被�
 
 默认只接受 HTTPS Origin。家庭内网、NAS、VPN 等链路本身可信或已加密的场景，可以由部署者显式放行明文 HTTP：
 
-```dotenv
-PMEM_ALLOW_INSECURE_HTTP=1
-PMEM_ORIGIN=http://192.168.1.10:3000
-HOST=0.0.0.0
+```json
+{
+  "allowInsecureHttp": true,
+  "origin": "http://192.168.1.10:3000",
+  "host": "0.0.0.0"
+}
 ```
 
-- 只有取值 `1` 生效，且只影响非回环的 HTTP Origin；HTTPS 与本机 loopback 的行为不变。未设置时启动失败，错误信息会提示该开关。
+将以上字段合入现有配置。
+
+- 只有布尔值 `true` 生效，且只影响非回环的 HTTP Origin；HTTPS 与本机 loopback 的行为不变。未设置时启动失败，错误信息会提示该开关。
 - 启动日志输出一行 `WARNING`。此时密码和会话 Cookie 以明文传输，同一网络上的其他人可以截获；不要用于公网。
-- `PMEM_ORIGIN` 必须与浏览器地址栏的协议、主机和端口完全一致，否则写入请求会被 Origin 校验拒绝。
-- 直接运行 Node 时把 `HOST` 改为内网地址或 `0.0.0.0`。Compose 示例只向宿主机回环地址发布端口，需把 `ports` 改为要监听的内网地址。
+- `origin` 必须与浏览器地址栏的协议、主机和端口完全一致，否则写入请求会被 Origin 校验拒绝。
+- 直接运行 Node 时把 `host` 改为内网地址或 `0.0.0.0`。Compose 示例只向宿主机回环地址发布端口，需把 `ports` 改为要监听的内网地址。
 - 浏览器把非 localhost 的 HTTP 页面视为不安全上下文，没有 Web Locks，草稿槽位因此降级：每次加载页面分配新的草稿槽位，刷新或关闭前尚未同步的草稿需从「本机草稿」恢复；恢复后原记录不会自动回收，确认不再需要后手动丢弃，丢弃时无法判断它是否仍被另一个标签页使用。
 
 ## OSS 初始化与权限
 
-使用私有 Bucket，地域例如 `oss-cn-hangzhou`。Bucket 必须**从未启用版本控制**；Enabled、Suspended 或读取版本状态失败都会拒绝启动。`PMEM_OSS_PREFIX` 是独占简单前缀，例如 `pmem/`。填写 `.env` 中全部 OSS 参数。RAM 凭据只在服务端使用；不要使用主账号密钥。
+使用私有 Bucket，地域例如 `oss-cn-hangzhou`。Bucket 必须**从未启用版本控制**；Enabled、Suspended 或读取版本状态失败都会拒绝启动。`oss.prefix` 是独占简单前缀，例如 `pmem/`。填写配置中的 `oss` 对象：
+
+```json
+{
+  "bucket": "your-private-bucket",
+  "region": "oss-cn-hangzhou",
+  "prefix": "pmem/",
+  "accessKeyId": "your-access-key-id",
+  "accessKeySecret": "your-access-key-secret"
+}
+```
+
+RAM 凭据只在服务端使用；不要使用主账号密钥。
 
 将以下策略中的 `YOUR_BUCKET` 和 `pmem/` 换为实际值。应用直接请求指定前缀，不需要控制台列出所有 Bucket 的权限。HEAD 使用 `oss:GetObject`；ListObjectsV2 使用 Bucket 级 `oss:ListObjects` 加 `oss:Prefix` 条件；版本检查需要独立的 Bucket 级权限。依据：[OSS 授权操作与条件](https://www.alibabacloud.com/help/en/oss/user-guide/authorization-syntax-and-elements)、[前缀访问策略](https://www.alibabacloud.com/help/en/oss/user-guide/access-control-base-on-ram-policy)。
 
@@ -105,11 +162,11 @@ HOST=0.0.0.0
 
 ```bash
 docker compose --profile oss build
-docker compose --profile oss run --rm --no-deps pmem-oss node dist/server/cli.js init-oss
+docker compose --profile oss run --rm --no-deps pmem-oss node dist/server/cli.js init-oss -c /config/pmem.json
 docker compose --profile oss up -d
 ```
 
-直接 Node 部署则设置 `PMEM_STORAGE=oss` 和持久化 `PMEM_STATE_DIR`，先执行 `pnpm setup init-oss`，再 `pnpm start`。容器强制 `/state` 独立挂载，Linux 上拒绝 tmpfs/ramfs。状态卷只有身份和待确认操作元数据，不保存笔记正文，不构成第二份正文存储。
+npm 部署则设置 `storage` 为 `oss` 和持久化 `stateDir`，先执行 `pmem init-oss`（可加 `-c`），再 `pmem start`。容器强制 `/state` 独立挂载，Linux 上拒绝 tmpfs/ramfs。状态卷只有身份和待确认操作元数据，不保存笔记正文，不构成第二份正文存储。
 
 初始化先同步本地 `owner.json`，再以禁止覆盖方式创建 `control/state-owner`。若初始化中断，保留原卷、原配置，重新执行初始化；不会生成新身份去覆盖已有标记。标记存在但本地身份缺失或不匹配时，即使显式初始化也会拒绝。启动失败先核对 Bucket、地域、RAM 权限、版本状态、原卷挂载及文件权限，不要删除 pending 记录来“修复”。
 

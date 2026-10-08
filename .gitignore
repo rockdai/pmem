@@ -149,3 +149,6 @@ vite.config.ts.timestamp-*
 test-results/
 playwright-report/
 *.tsbuildinfo
+
+# Local deployment configuration
+pmem.json

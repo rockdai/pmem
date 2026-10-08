@@ -2,12 +2,19 @@
 set -euo pipefail
 name="pmem-smoke-$RANDOM"
 volume="$name-data"
-cleanup() { docker rm -f "$name" >/dev/null 2>&1 || true; docker volume rm "$volume" >/dev/null 2>&1 || true; }
+config_dir=$(mktemp -d)
+cleanup() { docker rm -f "$name" >/dev/null 2>&1 || true; docker volume rm "$volume" >/dev/null 2>&1 || true; rm -rf "$config_dir"; }
 trap cleanup EXIT
 hash=$(printf '%s' 'container-test-password' | docker run --rm -i pmem:ci node dist/server/cli.js hash-password)
 key=$(docker run --rm pmem:ci node dist/server/cli.js key)
+PMEM_TEST_HASH="$hash" PMEM_TEST_KEY="$key" node --input-type=module - "$config_dir/pmem.json" <<'JS'
+import { writeFileSync } from 'node:fs';
+writeFileSync(process.argv[2], JSON.stringify({ account: 'test', passwordHash: process.env.PMEM_TEST_HASH, sessionKey: process.env.PMEM_TEST_KEY, origin: 'http://localhost:3000', host: '0.0.0.0', port: 3000, storage: 'local', dataDir: '/data', stateDir: '/state' }));
+JS
+chmod 755 "$config_dir"
+chmod 644 "$config_dir/pmem.json"
 docker volume create "$volume" >/dev/null
-docker run -d --name "$name" -e PMEM_ACCOUNT=test -e "PMEM_PASSWORD_HASH=$hash" -e "PMEM_SESSION_KEY=$key" -e PMEM_ORIGIN=http://localhost:3000 -e PMEM_STORAGE=local -v "$volume:/data" pmem:ci >/dev/null
+docker run -d --name "$name" -v "$config_dir/pmem.json:/config/pmem.json:ro" -v "$volume:/data" pmem:ci >/dev/null
 for attempt in {1..30}; do
   if docker exec "$name" node -e "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then break; fi
   sleep 1

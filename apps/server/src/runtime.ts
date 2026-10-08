@@ -1,8 +1,7 @@
-import { config } from './config';
+import type { Config } from './config';
 import { LocalStore } from './local';
 import { AliGateway, OssStore } from './oss';
-export async function runtime(initialize = false) {
-  const settings = config();
+export async function runtime(settings: Config, initialize = false) {
   if (settings.storage === 'local')
     return { settings, store: await LocalStore.create(settings.dataDir) };
   const oss = settings.oss!;

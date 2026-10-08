@@ -4,11 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AliGateway, OssStore } from '../apps/server/src/oss';
 import { Notes } from '../apps/server/src/storage';
-try {
-  process.loadEnvFile();
-} catch (e) {
-  if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
-}
+import { loadConfig } from '../apps/server/src/config';
 if (process.env.PMEM_OSS_INTEGRATION !== '1')
   throw new Error(
     'Opt-in only: set PMEM_OSS_INTEGRATION=1 and a dedicated empty PMEM_OSS_TEST_PREFIX',
@@ -18,18 +14,15 @@ const required = (key: string) => {
   if (!value) throw new Error(`Missing ${key}`);
   return value;
 };
+const settings = await loadConfig(process.argv[2]);
+if (settings.storage !== 'oss' || !settings.oss) throw new Error('Use an OSS configuration file');
 const prefix = required('PMEM_OSS_TEST_PREFIX');
-if (!/^test-[a-zA-Z0-9_-]+\/$/.test(prefix) || prefix === process.env.PMEM_OSS_PREFIX)
+if (!/^test-[a-zA-Z0-9_-]+\/$/.test(prefix) || prefix === settings.oss.prefix)
   throw new Error(
     'Test prefix must be test-<unique-name>/ and distinct from the application prefix',
   );
-const bucket = required('PMEM_OSS_BUCKET'),
-  gateway = new AliGateway(
-    bucket,
-    required('PMEM_OSS_REGION'),
-    required('PMEM_OSS_ACCESS_KEY_ID'),
-    required('PMEM_OSS_ACCESS_KEY_SECRET'),
-  );
+const { bucket, region, accessKeyId, accessKeySecret } = settings.oss;
+const gateway = new AliGateway(bucket, region, accessKeyId, accessKeySecret);
 const root = await mkdtemp(join(tmpdir(), 'pmem-oss-live-')),
   id = crypto.randomUUID();
 let initialized = false;

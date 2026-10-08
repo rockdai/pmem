@@ -46,20 +46,42 @@ Personal Memory 是一款开源、支持用户自托管的个人知识库产品�
 
 开源和用户自托管是产品的基本定位。部署方式和外部服务依赖的选择，需要兼顾用户自行运行产品的能力。
 
-## 运行 MVP
+## 安装与启动（0.1.0）
 
-需要 Node.js 24 和 pnpm 10.32.1。先按 [部署说明](docs/deployment.md) 生成密码哈希、会话密钥并填写 `.env`，然后：
+需要 Node.js 24。安装已包含服务端和网页，无需克隆仓库或安装 pnpm：
 
 ```bash
-corepack enable
-pnpm install --frozen-lockfile
-pnpm build
-pnpm start
+npm install -g pmem
+mkdir -p ~/.pmem
+cp "$(npm root -g)/pmem/pmem.example.json" ~/.pmem/pmem.json
+chmod 600 ~/.pmem/pmem.json
+pmem key
 ```
 
-默认本机地址为 `http://localhost:3000`。公开访问使用 HTTPS；可信内网可按部署说明显式开启 HTTP。也可用仓库中的 Dockerfile 和 Compose 部署，本地正文卷与 OSS 模式二选一。
+把 `pmem key` 的输出填入配置的 `sessionKey`。在 Bash 中生成密码哈希，再填入 `passwordHash`：
 
-已实现登录、最近修改列表、Markdown 富文本编辑、自动保存、删除、本机草稿恢复和多设备冲突提示。编辑器支持标题、强调、链接、列表、任务项、引用、代码块及简单 `/` 菜单。新建空编辑区不会创建远端文件；正文只在用户编辑后保存。
+```bash
+read -r -s -p 'Password (12+ characters): ' pmem_password
+printf '%s' "$pmem_password" | pmem hash-password
+unset pmem_password
+```
+
+配置默认读取 `~/.pmem/pmem.json`，不再读取 `.env` 或旧的 `PMEM_*` 配置环境变量。填写 `account` 后启动：
+
+```bash
+pmem start                         # 前台，Ctrl+C 停止
+pmem start -d                      # 后台运行
+pmem start -c /path/to/pmem.json    # 指定配置，也可与 -d 组合
+pmem stop                         # 停止当前用户的服务
+```
+
+默认访问 `http://localhost:3000`。每个系统用户运行一个服务，后台日志为 `~/.pmem/pmem.log`；daemon 不会自动开机启动。相对数据路径以配置文件所在目录为基准，默认笔记在 `~/.pmem/data/notes/`。从旧版本迁移时，在 `dataDir` / `stateDir` 中填写原数据目录的绝对路径，以继续使用已有笔记和 OSS 状态。
+
+全部字段、HTTPS、OSS 与 Docker 配置见 [部署说明](docs/deployment.md)。公开访问使用 HTTPS；可信内网可显式配置 `allowInsecureHttp: true`。
+
+源码开发需要 pnpm 10.32.1：`corepack enable` → `pnpm install --frozen-lockfile` → `pnpm build` → `pnpm start`，配置路径与全局 CLI 相同。
+
+已实现登录、最近修改列表、Markdown 富文本编辑、自动保存、删除、本机草稿恢复和多设备冲突提示。编辑器支持标题、强调、链接、列表、任务项、引用、代码块。新建空编辑区不会创建远端文件；正文只在用户编辑后保存。
 
 当前采用 React / Vite、Tiptap / ProseMirror、原生 IndexedDB、Fastify 和 OSS SDK。没有 React Router 或 Dexie，首字输入需要的全部代码计入 250 KiB gzip 预算。默认每 500 ms 防抖保存，可见页面每 5 s 检查当前笔记。已打开页面断网可继续保留草稿，不承诺离线冷启动。
 
@@ -69,6 +91,7 @@ pnpm start
 
 ```bash
 pnpm test
+pnpm test:package
 pnpm exec playwright install chromium
 pnpm test:e2e
 pnpm bench:web

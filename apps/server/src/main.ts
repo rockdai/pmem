@@ -1,35 +1,19 @@
 import { createApp } from './app';
+import type { Config } from './config';
 import { runtime } from './runtime';
-try {
-  process.loadEnvFile();
-} catch (e) {
-  if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
-}
-try {
-  const { settings, store } = await runtime();
+export async function startServer(settings: Config) {
+  const { store } = await runtime(settings);
   const app = await createApp(settings, store);
-  await app.listen({ host: settings.host, port: settings.port });
+  try {
+    await app.listen({ host: settings.host, port: settings.port });
+  } catch (e) {
+    await app.close();
+    throw e;
+  }
   console.log(`Personal Memory listening on port ${settings.port} (${settings.storage})`);
   if (settings.insecureHttp)
     console.warn(
-      `WARNING: PMEM_ALLOW_INSECURE_HTTP=1: the password and session cookie travel in plaintext over ${settings.origin}. Use only on a trusted network.`,
+      `WARNING: allowInsecureHttp: true: the password and session cookie travel in plaintext over ${settings.origin}. Use only on a trusted network.`,
     );
-  let stopping = false;
-  const close = async () => {
-    if (stopping) return;
-    stopping = true;
-    await app.close();
-    process.exit(0);
-  };
-  process.on('SIGTERM', close);
-  process.on('SIGINT', close);
-} catch (error) {
-  // SDK errors may include credentials/request bodies: log only a bounded diagnostic.
-  console.error(
-    'Startup failed:',
-    error instanceof Error && !('requestId' in error)
-      ? error.message.split('\n')[0]
-      : 'OSS access failed; verify RAM permissions, connectivity and state volume',
-  );
-  process.exitCode = 1;
+  return app;
 }
