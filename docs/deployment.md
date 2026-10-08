@@ -5,9 +5,9 @@
 ## npm 安装与配置
 
 ```bash
-npm install -g pmem
+npm install -g @rockdai/pmem
 mkdir -p ~/.pmem
-cp "$(npm root -g)/pmem/pmem.example.json" ~/.pmem/pmem.json
+cp "$(npm root -g)/@rockdai/pmem/pmem.example.json" ~/.pmem/pmem.json
 chmod 600 ~/.pmem/pmem.json
 pmem key
 # 以下密码输入命令在 Bash 中执行：

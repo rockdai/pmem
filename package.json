@@ -1,5 +1,5 @@
 {
-  "name": "pmem",
+  "name": "@rockdai/pmem",
   "type": "module",
   "engines": {
     "node": ">=24 <25"

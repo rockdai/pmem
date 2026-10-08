@@ -51,9 +51,9 @@ Personal Memory 是一款开源、支持用户自托管的个人知识库产品�
 需要 Node.js 24。安装已包含服务端和网页，无需克隆仓库或安装 pnpm：
 
 ```bash
-npm install -g pmem
+npm install -g @rockdai/pmem
 mkdir -p ~/.pmem
-cp "$(npm root -g)/pmem/pmem.example.json" ~/.pmem/pmem.json
+cp "$(npm root -g)/@rockdai/pmem/pmem.example.json" ~/.pmem/pmem.json
 chmod 600 ~/.pmem/pmem.json
 pmem key
 ```

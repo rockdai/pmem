@@ -51,6 +51,8 @@ try {
     { env: npmEnv },
   );
   const pack = JSON.parse(stdout)[0];
+  assert.equal(pack.name, '@rockdai/pmem');
+  const packageRoot = join(prefix, 'lib', 'node_modules', pack.name);
   for (const { path } of pack.files) {
     assert.match(
       path,
@@ -73,7 +75,11 @@ try {
   );
   if (installed.stderr) process.stderr.write(installed.stderr);
   assert.equal(await cli(['--version']), '0.1.0');
-  assert.match(await cli(['--help']), /~\/\.pmem\/pmem.json/);
+  const help = await cli(['--help']);
+  assert.match(help, /~\/\.pmem\/pmem.json/);
+  const examplePath = join(packageRoot, 'pmem.example.json');
+  assert.ok(help.includes(examplePath));
+  assert.equal(JSON.parse(await readFile(examplePath, 'utf8')).storage, 'local');
   const config = {
     account: 'test',
     passwordHash: await cli(['hash-password'], 'package-test-password'),
@@ -108,7 +114,7 @@ try {
   assert.equal(page.status, 200);
   assert.match(await page.text(), /<div id="root">/);
   for (const asset of await readdir(
-    join(prefix, 'lib', 'node_modules', 'pmem', 'dist', 'web', 'assets'),
+    join(packageRoot, 'dist', 'web', 'assets'),
   )) {
     if (!/\.(js|css)$/.test(asset)) continue;
     const response = await fetch(`${origin}/assets/${asset}`);
