@@ -8,6 +8,13 @@ const base = {
   passwordHash: `scrypt$${'0'.repeat(32)}$${'0'.repeat(128)}`,
   sessionKey: 'ab'.repeat(32),
 };
+const oss = {
+  bucket: 'test-bucket',
+  region: 'oss-cn-hangzhou',
+  prefix: 'pmem/',
+  accessKeyId: 'id',
+  accessKeySecret: 'secret',
+};
 let root: string;
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'pmem-config-'));
@@ -67,13 +74,6 @@ it.each([
   expect(() => config(input)).toThrow();
 });
 it('validates the nested OSS credentials and prefix', () => {
-  const oss = {
-    bucket: 'test-bucket',
-    region: 'oss-cn-hangzhou',
-    prefix: 'pmem/',
-    accessKeyId: 'id',
-    accessKeySecret: 'secret',
-  };
   expect(config({ ...base, storage: 'oss', oss }).oss).toEqual(oss);
   expect(() => config({ ...base, storage: 'oss', oss: { ...oss, prefix: '../' } })).toThrow(
     'prefix',
@@ -83,5 +83,47 @@ it('validates the nested OSS credentials and prefix', () => {
   );
   expect(() => config({ ...base, storage: 'oss', oss: { ...oss, typo: true } })).toThrow(
     'Unknown oss',
+  );
+});
+it.each([
+  ['oss-cn-hangzhou-internal.aliyuncs.com', 'https://oss-cn-hangzhou-internal.aliyuncs.com'],
+  [
+    'https://oss-cn-hangzhou-internal.aliyuncs.com/',
+    'https://oss-cn-hangzhou-internal.aliyuncs.com',
+  ],
+  ['https://oss-cn-hangzhou.aliyuncs.com', 'https://oss-cn-hangzhou.aliyuncs.com'],
+  [
+    'oss-cn-shanghai-internal.aliyuncs.com:443',
+    'https://oss-cn-shanghai-internal.aliyuncs.com',
+  ],
+])('loads an explicit OSS endpoint from JSON: %s', async (endpoint, expected) => {
+  const path = join(root, 'pmem.json');
+  await writeFile(
+    path,
+    JSON.stringify({ ...base, storage: 'oss', oss: { ...oss, endpoint } }),
+  );
+  expect((await loadConfig(path)).oss?.endpoint).toBe(expected);
+});
+it.each([
+  null,
+  true,
+  123,
+  {},
+  '',
+  ' ',
+  'https://',
+  'http://oss-cn-hangzhou-internal.aliyuncs.com',
+  'ftp://oss-cn-hangzhou-internal.aliyuncs.com',
+  'https://private-id:private-secret@oss-cn-hangzhou-internal.aliyuncs.com',
+  'https://oss-cn-hangzhou-internal.aliyuncs.com/pmem/',
+  'https://oss-cn-hangzhou-internal.aliyuncs.com/../',
+  'https://oss-cn-hangzhou-internal.aliyuncs.com?secret=private-secret',
+  'https://oss-cn-hangzhou-internal.aliyuncs.com#fragment',
+  'oss-cn-hangzhou-internal.aliyuncs.com:65536',
+  'oss-cn-hangzhou-internal.aliyuncs.com\n',
+  'https://oss-cn-hangzhou-internal.aliyuncs.com\\path',
+])('rejects an invalid OSS endpoint without exposing its value: %#', (endpoint) => {
+  expect(() => config({ ...base, storage: 'oss', oss: { ...oss, endpoint } })).toThrow(
+    /^oss\.endpoint must be a hostname or HTTPS URL without credentials, path, query or fragment$/,
   );
 });

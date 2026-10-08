@@ -43,7 +43,7 @@ unset pmem_password
 | `storage` | `local`，可选 `oss` |
 | `dataDir` / `stateDir` | 配置文件旁的 `data` / `state`，支持绝对路径、相对路径和 `~/` |
 | `allowInsecureHttp` | `false`；可信内网明文 HTTP 必须显式设为布尔值 `true` |
-| `oss` | OSS 模式必填，包含 `bucket`、`region`、`prefix`、`accessKeyId`、`accessKeySecret` |
+| `oss` | OSS 模式必填，包含 `bucket`、`region`、`prefix`、`accessKeyId`、`accessKeySecret`；可选 `endpoint` 指定访问地址 |
 
 配置使用 JSON 文件，默认地址为 `~/.pmem/pmem.json`，`-c` 可指定其他文件。容器镜像内部的 `PMEM_CONTAINER=1` 仅用于启用持久挂载检查。未知字段、无效类型和非法值会在启动时被拒绝。配置缺失不会自动生成账号或密码。
 
@@ -126,6 +126,10 @@ Web/API 同源，不直接公开 OSS。外部 HTTP Origin 默认在启动时被�
 ```
 
 RAM 凭据只在服务端使用；不要使用主账号密钥。
+
+部署在与 Bucket 同地域的阿里云 ECS 上时，建议在上述 `oss` 对象中增加 `"endpoint": "https://oss-cn-hangzhou-internal.aliyuncs.com"`（按实际地域替换），让初始化、版本检查和所有笔记读写使用 OSS 内网。内网访问可减少公网延迟波动，且不产生公网流量费用；部署环境必须能够路由到该内网地址，普通本机或其他云服务器通常无法直接访问。[阿里云访问域名说明](https://www.alibabacloud.com/help/zh/oss/user-guide/access-oss-via-bucket-domain-name)。
+
+`oss.endpoint` 也接受不带协议的主机名，统一使用 HTTPS；不要填写 Bucket 名称前缀、对象路径、凭据、查询参数或片段。省略时按 `oss.region` 使用默认公网 endpoint；填写时优先使用指定地址，`region` 仍填写 Bucket 的实际地域。内网连接失败会报告错误，不自动切回公网。修改配置后重启服务即可应用，无需重新初始化状态卷；`pmem init-oss` 和真实 OSS 集成测试也使用同一配置。
 
 将以下策略中的 `YOUR_BUCKET` 和 `pmem/` 换为实际值。应用直接请求指定前缀，不需要控制台列出所有 Bucket 的权限。HEAD 使用 `oss:GetObject`；ListObjectsV2 使用 Bucket 级 `oss:ListObjects` 加 `oss:Prefix` 条件；版本检查需要独立的 Bucket 级权限。依据：[OSS 授权操作与条件](https://www.alibabacloud.com/help/en/oss/user-guide/authorization-syntax-and-elements)、[前缀访问策略](https://www.alibabacloud.com/help/en/oss/user-guide/access-control-base-on-ram-policy)。
 

@@ -1,5 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
+import { createRequire } from 'node:module';
+import { Readable } from 'node:stream';
 import { mkdtemp, rm, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -14,8 +16,12 @@ import { Notes, digest } from './storage';
 import * as files from './files';
 import { createApp } from './app';
 import { config } from './config';
+import { runtime } from './runtime';
 import { hashPassword } from './auth';
 import type { RuntimeDiagnostic } from './diagnostics';
+const transport = createRequire(import.meta.resolve('ali-oss'))('urllib') as {
+  request(url: string, options: { method: string; content?: Buffer }): Promise<unknown>;
+};
 class MemoryGateway implements ObjectGateway {
   objects = new Map<string, ObjectData>();
   heads = 0;
@@ -73,6 +79,129 @@ afterEach(async () => {
   vi.restoreAllMocks();
   await Promise.all(dirs.splice(0).map((p) => rm(p, { recursive: true, force: true })));
 });
+it.each([
+  [undefined, 'test-bucket.oss-cn-hangzhou.aliyuncs.com'],
+  [
+    'oss-cn-hangzhou-internal.aliyuncs.com',
+    'test-bucket.oss-cn-hangzhou-internal.aliyuncs.com',
+  ],
+  [
+    'https://oss-cn-hangzhou-internal.aliyuncs.com',
+    'test-bucket.oss-cn-hangzhou-internal.aliyuncs.com',
+  ],
+  [
+    'https://oss-cn-shanghai-internal.aliyuncs.com',
+    'test-bucket.oss-cn-shanghai-internal.aliyuncs.com',
+  ],
+])(
+  'uses the configured OSS endpoint for initialization, restart and CRUD: %s',
+  async (endpoint, hostname) => {
+    const objects = new Map<string, Buffer>();
+    const request = vi
+      .spyOn(transport, 'request')
+      .mockImplementation(async (target, options) => {
+        const url = new URL(target);
+        const key = url.pathname.slice(1);
+        let status = 200;
+        let data: Buffer = Buffer.alloc(0);
+        if (url.searchParams.has('versioning'))
+          data = Buffer.from('<VersioningConfiguration/>');
+        else if (url.searchParams.has('list-type')) {
+          const contents = [...objects]
+            .filter(([key]) => key.startsWith(url.searchParams.get('prefix')!))
+            .map(
+              ([key, body]) =>
+                `<Contents><Key>${key}</Key><Size>${body.length}</Size><LastModified>2026-10-08T00:00:00Z</LastModified><ETag>${digest(body)}</ETag></Contents>`,
+            )
+            .join('');
+          data = Buffer.from(
+            `<ListBucketResult><IsTruncated>false</IsTruncated>${contents}</ListBucketResult>`,
+          );
+        } else if (options.method === 'PUT') objects.set(key, Buffer.from(options.content!));
+        else if (options.method === 'DELETE') {
+          objects.delete(key);
+          status = 204;
+        } else if (objects.has(key)) data = objects.get(key)!;
+        else status = 404;
+        const headers = {
+          'content-length': String(data.length),
+          'last-modified': 'Thu, 08 Oct 2026 00:00:00 GMT',
+          etag: digest(data),
+        };
+        return {
+          status,
+          headers,
+          data,
+          res: Object.assign(Readable.from([data]), { status, headers }),
+        };
+      });
+    const settings = config({
+      account: 'me',
+      passwordHash: `scrypt$${'0'.repeat(32)}$${'0'.repeat(128)}`,
+      sessionKey: 'ab'.repeat(32),
+      storage: 'oss',
+      stateDir: await temp(),
+      oss: {
+        bucket: 'test-bucket',
+        region: 'oss-cn-hangzhou',
+        prefix: 'pmem/',
+        endpoint,
+        accessKeyId: 'id',
+        accessKeySecret: 'secret',
+      },
+    });
+    await runtime(settings, true);
+    const { store } = await runtime(settings);
+    const notes = new Notes(store);
+    const id = randomUUID();
+    const first = await notes.write(id, Buffer.from('first'), 'create');
+    expect((await notes.get(id)).body?.toString()).toBe('first');
+    expect((await notes.get(id, first)).body).toBeUndefined();
+    expect((await notes.list()).notes.map((note) => note.id)).toEqual([id]);
+    const next = await notes.write(id, Buffer.from('updated'), 'replace', first);
+    expect((await notes.get(id)).body?.toString()).toBe('updated');
+    await notes.remove(id, next);
+    await expect(notes.get(id)).rejects.toMatchObject({ status: 404 });
+    expect(new Set(request.mock.calls.map(([, options]) => options.method))).toEqual(
+      new Set(['GET', 'HEAD', 'PUT', 'DELETE']),
+    );
+    for (const [target] of request.mock.calls) {
+      const url = new URL(target);
+      expect(url.protocol).toBe('https:');
+      expect(url.hostname).toBe(hostname);
+    }
+  },
+);
+it.each([false, true])(
+  'fails without falling back to the public endpoint when the internal network is unavailable (initialize=%s)',
+  async (initialize) => {
+    const request = vi
+      .spyOn(transport, 'request')
+      .mockRejectedValue(
+        Object.assign(new Error('unreachable'), { name: 'RequestError', status: -1 }),
+      );
+    const settings = config({
+      account: 'me',
+      passwordHash: `scrypt$${'0'.repeat(32)}$${'0'.repeat(128)}`,
+      sessionKey: 'ab'.repeat(32),
+      storage: 'oss',
+      stateDir: await temp(),
+      oss: {
+        bucket: 'test-bucket',
+        region: 'oss-cn-hangzhou',
+        prefix: 'pmem/',
+        endpoint: 'oss-cn-hangzhou-internal.aliyuncs.com',
+        accessKeyId: 'id',
+        accessKeySecret: 'secret',
+      },
+    });
+    await expect(runtime(settings, initialize)).rejects.toThrow('unreachable');
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(new URL(request.mock.calls[0][0]).hostname).toBe(
+      'test-bucket.oss-cn-hangzhou-internal.aliyuncs.com',
+    );
+  },
+);
 it('persists uncertainty across restart and blocks later writes until the late write is observed', async () => {
   const gateway = new MemoryGateway(),
     root = await temp(),

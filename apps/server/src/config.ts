@@ -16,6 +16,7 @@ export interface Config {
   oss?: {
     bucket: string;
     region: string;
+    endpoint?: string;
     prefix: string;
     accessKeyId: string;
     accessKeySecret: string;
@@ -65,6 +66,22 @@ function boolean(input: Record<string, unknown>, key: string): boolean {
   if (input[key] !== undefined && typeof input[key] !== 'boolean')
     throw new Error(`${key} must be a boolean`);
   return input[key] === true;
+}
+function ossEndpoint(input: unknown): string | undefined {
+  if (input === undefined) return;
+  const message =
+    'oss.endpoint must be a hostname or HTTPS URL without credentials, path, query or fragment';
+  if (
+    typeof input !== 'string' ||
+    input.trim() !== input ||
+    !/^(?:https:\/\/)?[a-zA-Z0-9][a-zA-Z0-9.-]*(?::[0-9]+)?\/?$/.test(input)
+  )
+    throw new Error(message);
+  try {
+    return new URL(input.startsWith('https://') ? input : `https://${input}`).origin;
+  } catch {
+    throw new Error(message);
+  }
 }
 export function config(input: unknown, base = pmemHome()): Config {
   const values = object(input, 'Configuration');
@@ -129,7 +146,15 @@ export function config(input: unknown, base = pmemHome()): Config {
     const oss = object(values.oss, 'oss');
     if (
       Object.keys(oss).some(
-        (key) => !['prefix', 'bucket', 'region', 'accessKeyId', 'accessKeySecret'].includes(key),
+        (key) =>
+          ![
+            'prefix',
+            'bucket',
+            'region',
+            'endpoint',
+            'accessKeyId',
+            'accessKeySecret',
+          ].includes(key),
       )
     )
       throw new Error('Unknown oss configuration field');
@@ -140,6 +165,7 @@ export function config(input: unknown, base = pmemHome()): Config {
       prefix,
       bucket: string(oss, 'bucket'),
       region: string(oss, 'region'),
+      endpoint: ossEndpoint(oss.endpoint),
       accessKeyId: string(oss, 'accessKeyId'),
       accessKeySecret: string(oss, 'accessKeySecret'),
     };
