@@ -80,22 +80,35 @@ afterEach(async () => {
   await Promise.all(dirs.splice(0).map((p) => rm(p, { recursive: true, force: true })));
 });
 it.each([
-  [undefined, 'test-bucket.oss-cn-hangzhou.aliyuncs.com'],
+  [undefined, 'test-bucket.oss-cn-hangzhou.aliyuncs.com', undefined],
   [
     'oss-cn-hangzhou-internal.aliyuncs.com',
     'test-bucket.oss-cn-hangzhou-internal.aliyuncs.com',
+    undefined,
   ],
   [
     'https://oss-cn-hangzhou-internal.aliyuncs.com',
     'test-bucket.oss-cn-hangzhou-internal.aliyuncs.com',
+    undefined,
   ],
   [
     'https://oss-cn-shanghai-internal.aliyuncs.com',
     'test-bucket.oss-cn-shanghai-internal.aliyuncs.com',
+    undefined,
+  ],
+  [
+    'https://oss-cn-hangzhou-internal.aliyuncs.com',
+    'test-bucket.oss-cn-hangzhou-internal.aliyuncs.com',
+    '',
+  ],
+  [
+    'https://oss-cn-hangzhou-internal.aliyuncs.com',
+    'test-bucket.oss-cn-hangzhou-internal.aliyuncs.com',
+    'personal/',
   ],
 ])(
-  'uses the configured OSS endpoint for initialization, restart and CRUD: %s',
-  async (endpoint, hostname) => {
+  'uses endpoint %s (host %s) and optional prefix %s for initialization, restart and CRUD',
+  async (endpoint, hostname, prefix) => {
     const objects = new Map<string, Buffer>();
     const request = vi
       .spyOn(transport, 'request')
@@ -144,7 +157,7 @@ it.each([
       oss: {
         bucket: 'test-bucket',
         region: 'oss-cn-hangzhou',
-        prefix: 'pmem/',
+        prefix,
         endpoint,
         accessKeyId: 'id',
         accessKeySecret: 'secret',
@@ -154,7 +167,12 @@ it.each([
     const { store } = await runtime(settings);
     const notes = new Notes(store);
     const id = randomUUID();
+    const noteKey = `${prefix ?? ''}notes/${id}.md`;
+    const ownerKey = `${prefix ?? ''}control/state-owner`;
     const first = await notes.write(id, Buffer.from('first'), 'create');
+    expect([...objects.keys()].sort()).toEqual([ownerKey, noteKey]);
+    expect(objects.get(noteKey)?.toString()).toBe('first');
+    expect(JSON.parse(objects.get(ownerKey)!.toString()).prefix).toBe(prefix ?? '');
     expect((await notes.get(id)).body?.toString()).toBe('first');
     expect((await notes.get(id, first)).body).toBeUndefined();
     expect((await notes.list()).notes.map((note) => note.id)).toEqual([id]);
@@ -162,6 +180,7 @@ it.each([
     expect((await notes.get(id)).body?.toString()).toBe('updated');
     await notes.remove(id, next);
     await expect(notes.get(id)).rejects.toMatchObject({ status: 404 });
+    expect([...objects.keys()]).toEqual([ownerKey]);
     expect(new Set(request.mock.calls.map(([, options]) => options.method))).toEqual(
       new Set(['GET', 'HEAD', 'PUT', 'DELETE']),
     );
@@ -169,6 +188,10 @@ it.each([
       const url = new URL(target);
       expect(url.protocol).toBe('https:');
       expect(url.hostname).toBe(hostname);
+      if (url.searchParams.has('list-type'))
+        expect(url.searchParams.get('prefix')).toBe(`${prefix ?? ''}notes/`);
+      else if (!url.searchParams.has('versioning'))
+        expect([`/${ownerKey}`, `/${noteKey}`]).toContain(url.pathname);
     }
   },
 );
@@ -189,7 +212,6 @@ it.each([false, true])(
       oss: {
         bucket: 'test-bucket',
         region: 'oss-cn-hangzhou',
-        prefix: 'pmem/',
         endpoint: 'oss-cn-hangzhou-internal.aliyuncs.com',
         accessKeyId: 'id',
         accessKeySecret: 'secret',

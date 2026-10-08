@@ -158,9 +158,15 @@ export function config(input: unknown, base = pmemHome()): Config {
       )
     )
       throw new Error('Unknown oss configuration field');
-    const prefix = string(oss, 'prefix');
-    if (!/^[a-zA-Z0-9_-][a-zA-Z0-9_/-]*\/$/.test(prefix) || prefix.includes('//'))
-      throw new Error('OSS prefix must be a simple relative path ending in /');
+    const prefix = oss.prefix === undefined ? '' : oss.prefix;
+    if (
+      typeof prefix !== 'string' ||
+      (prefix !== '' &&
+        (!/^[a-zA-Z0-9_-][a-zA-Z0-9_/-]*\/$/.test(prefix) ||
+          prefix.includes('//') ||
+          prefix.trim() !== prefix))
+    )
+      throw new Error('OSS prefix must be empty or a simple relative path ending in /');
     value.oss = {
       prefix,
       bucket: string(oss, 'bucket'),

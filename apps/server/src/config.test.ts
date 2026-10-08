@@ -11,7 +11,6 @@ const base = {
 const oss = {
   bucket: 'test-bucket',
   region: 'oss-cn-hangzhou',
-  prefix: 'pmem/',
   accessKeyId: 'id',
   accessKeySecret: 'secret',
 };
@@ -73,16 +72,43 @@ it.each([
 ])('rejects invalid configuration %#', (input) => {
   expect(() => config(input)).toThrow();
 });
-it('validates the nested OSS credentials and prefix', () => {
-  expect(config({ ...base, storage: 'oss', oss }).oss).toEqual(oss);
-  expect(() => config({ ...base, storage: 'oss', oss: { ...oss, prefix: '../' } })).toThrow(
-    'prefix',
-  );
+it('validates the nested OSS credentials and defaults to the bucket root', () => {
+  expect(config({ ...base, storage: 'oss', oss }).oss).toEqual({ ...oss, prefix: '' });
   expect(() => config({ ...base, storage: 'oss', oss: { ...oss, accessKeySecret: '' } })).toThrow(
     'accessKeySecret',
   );
   expect(() => config({ ...base, storage: 'oss', oss: { ...oss, typo: true } })).toThrow(
     'Unknown oss',
+  );
+});
+it.each([
+  [undefined, ''],
+  ['', ''],
+  ['personal/', 'personal/'],
+  ['team/notes/', 'team/notes/'],
+])('loads an optional OSS prefix from JSON: %s', async (prefix, expected) => {
+  const path = join(root, 'pmem.json');
+  await writeFile(path, JSON.stringify({ ...base, storage: 'oss', oss: { ...oss, prefix } }));
+  expect((await loadConfig(path)).oss?.prefix).toBe(expected);
+});
+it.each([
+  null,
+  true,
+  123,
+  {},
+  [],
+  ' ',
+  '/',
+  '../',
+  'personal',
+  '/personal/',
+  'a//b/',
+  'a/../',
+  'a/\n',
+  'a/\0',
+])('rejects an invalid OSS prefix: %#', (prefix) => {
+  expect(() => config({ ...base, storage: 'oss', oss: { ...oss, prefix } })).toThrow(
+    'OSS prefix must be empty or a simple relative path ending in /',
   );
 });
 it.each([
