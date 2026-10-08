@@ -46,7 +46,7 @@ Personal Memory 是一款开源、支持用户自托管的个人知识库产品�
 
 开源和用户自托管是产品的基本定位。部署方式和外部服务依赖的选择，需要兼顾用户自行运行产品的能力。
 
-## 安装与启动（0.1.0）
+## 安装与启动
 
 需要 Node.js 24。安装已包含服务端和网页，无需克隆仓库或安装 pnpm：
 
@@ -66,16 +66,20 @@ printf '%s' "$pmem_password" | pmem hash-password
 unset pmem_password
 ```
 
-配置默认读取 `~/.pmem/pmem.json`，不再读取 `.env` 或旧的 `PMEM_*` 配置环境变量。填写 `account` 后启动：
+配置使用 JSON 文件，默认读取 `~/.pmem/pmem.json`。填写 `account` 后启动：
 
 ```bash
 pmem start                         # 前台，Ctrl+C 停止
 pmem start -d                      # 后台运行
 pmem start -c /path/to/pmem.json    # 指定配置，也可与 -d 组合
 pmem stop                         # 停止当前用户的服务
+pmem passwd                       # 隐藏输入两次新密码并保存
+pmem passwd -c /path/to/pmem.json   # 修改指定配置的密码
 ```
 
-默认访问 `http://localhost:3000`。每个系统用户运行一个服务，后台日志为 `~/.pmem/pmem.log`；daemon 不会自动开机启动。相对数据路径以配置文件所在目录为基准，默认笔记在 `~/.pmem/data/notes/`。从旧版本迁移时，在 `dataDir` / `stateDir` 中填写原数据目录的绝对路径，以继续使用已有笔记和 OSS 状态。
+`passwd` 需要交互式终端，新密码至少 12 字符。运行中的同配置服务会立即应用新密码并使旧会话失效，无需重启；服务未启动时，下次启动生效。
+
+默认访问 `http://localhost:3000`。每个系统用户运行一个服务，后台日志为 `~/.pmem/pmem.log`；daemon 不会自动开机启动。相对数据路径以配置文件所在目录为基准，默认笔记在 `~/.pmem/data/notes/`。
 
 全部字段、HTTPS、OSS 与 Docker 配置见 [部署说明](docs/deployment.md)。公开访问使用 HTTPS；可信内网可显式配置 `allowInsecureHttp: true`。
 

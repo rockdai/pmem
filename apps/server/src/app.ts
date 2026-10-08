@@ -10,6 +10,11 @@ import { MAX_BYTES, type SessionInfo } from '../../../packages/contracts/src/ind
 import { AppError, Notes, type Store } from './storage';
 import { binding, checkPassword, equal } from './auth';
 import type { Config } from './config';
+declare module 'fastify' {
+  interface FastifyInstance {
+    updatePasswordHash(value: string): void;
+  }
+}
 declare module '@fastify/secure-session' {
   interface SessionData {
     account: string;
@@ -35,8 +40,9 @@ export async function createApp(
     requestTimeout: 30_000,
     routerOptions: { maxParamLength: 100 },
   });
-  const notes = new Notes(store),
-    authBinding = binding(config.sessionKey, config.account, config.passwordHash);
+  const notes = new Notes(store);
+  let passwordHash = config.passwordHash,
+    authBinding = binding(config.sessionKey, config.account, passwordHash);
   const deployment = createHmac('sha256', config.sessionKey)
     .update(
       `${config.account}:${config.storage}:${config.oss ? config.oss.bucket + '/' + config.oss.prefix : config.dataDir}`,
@@ -124,8 +130,10 @@ export async function createApp(
       const { account, password } = request.body ?? {};
       if (typeof account !== 'string' || typeof password !== 'string')
         throw new AppError(400, 'invalid_credentials');
-      const valid = await checkPassword(password, config.passwordHash);
-      if (account !== config.account || !valid) throw new AppError(401, 'invalid_credentials');
+      const currentHash = passwordHash;
+      const valid = await checkPassword(password, currentHash);
+      if (account !== config.account || !valid || currentHash !== passwordHash)
+        throw new AppError(401, 'invalid_credentials');
       request.session.regenerate();
       request.session.set('account', config.account);
       request.session.set('authBinding', authBinding);
@@ -201,5 +209,9 @@ export async function createApp(
       },
     });
   }
+  app.decorate('updatePasswordHash', (value: string) => {
+    passwordHash = value;
+    authBinding = binding(config.sessionKey, config.account, value);
+  });
   return app;
 }

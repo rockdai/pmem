@@ -1,10 +1,11 @@
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { mkdir, open, readFile, unlink } from 'node:fs/promises';
+import { mkdir, open, readFile, realpath, unlink } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
-import { pmemHome, type Config } from './config';
+import { isDeepStrictEqual } from 'node:util';
+import { loadConfig, pmemHome, type Config } from './config';
 import { startServer } from './main';
 interface ServiceRecord {
   pid: number;
@@ -87,27 +88,74 @@ export async function stopService() {
   await response.text();
   console.log('pmem stopped.');
 }
-export async function runService(settings: Config) {
+export async function reloadPassword(path: string): Promise<'applied' | 'inactive'> {
+  try {
+    const record = await readRecord();
+    if (!record || !alive(record.pid)) return 'inactive';
+    const query = new URLSearchParams({ config: await realpath(path) });
+    const response = await fetch(`http://127.0.0.1:${record.port}/reload-password?${query}`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${record.token}` },
+      signal: AbortSignal.timeout(5000),
+    });
+    await response.text();
+    if (response.status === 412) return 'inactive';
+    if (!response.ok) throw new Error();
+    return 'applied';
+  } catch {
+    throw new Error(
+      'Password saved, but the running service could not apply it. Restart pmem to use the new password.',
+    );
+  }
+}
+export async function runService(settings: Config, configPath: string) {
+  const serviceConfig = await realpath(configPath);
   await mkdir(pmemHome(), { recursive: true, mode: 0o700 });
   const token = randomBytes(32).toString('hex');
   let app: Awaited<ReturnType<typeof startServer>> | undefined;
   let stopping: Promise<void> | undefined;
+  let reloading = Promise.resolve();
   const shutdown = () =>
     (stopping ??= (async () => {
       await app?.close();
       await removeRecord(token);
     })());
   const control = createServer((request, response) => {
+    const route = request.url?.split('?')[0];
     if (
       request.method !== 'POST' ||
-      request.url !== '/stop' ||
+      !['/stop', '/reload-password'].includes(route ?? '') ||
       request.headers.authorization !== `Bearer ${token}`
     ) {
       response.writeHead(404).end();
       return;
     }
-    if (!app) {
+    if (!app || stopping) {
       response.writeHead(409).end();
+      return;
+    }
+    if (route === '/reload-password') {
+      const query = new URLSearchParams(request.url!.split('?')[1]);
+      if (query.get('config') !== serviceConfig) {
+        response.writeHead(412).end();
+        return;
+      }
+      reloading = reloading
+        .then(() => loadConfig(configPath))
+        .then((updated) => {
+          if (
+            stopping ||
+            !isDeepStrictEqual({ ...updated, passwordHash: settings.passwordHash }, settings)
+          ) {
+            response.writeHead(409).end();
+            return;
+          }
+          app!.updatePasswordHash(updated.passwordHash);
+          response.writeHead(200).end('applied');
+        })
+        .catch(() => {
+          response.writeHead(500).end();
+        });
       return;
     }
     void shutdown()
