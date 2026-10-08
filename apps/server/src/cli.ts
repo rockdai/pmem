@@ -8,6 +8,7 @@ import { hashPassword } from './auth';
 import { defaultConfigPath, expandPath, loadConfig } from './config';
 import { runService, startDaemon, stopService } from './daemon';
 import { runtime } from './runtime';
+import { changePassword } from './passwd';
 const example = new URL(
   existsSync(new URL('../../pmem.example.json', import.meta.url))
     ? '../../pmem.example.json'
@@ -18,6 +19,7 @@ const help = `Personal Memory ${packageInfo.version}
 Usage:
   pmem start [-d|--daemon] [-c|--config <path>]
   pmem stop
+  pmem passwd [-c|--config <path>]    Change password interactively
   pmem key
   pmem hash-password                 Read a password from stdin
   pmem init-oss [-c|--config <path>]
@@ -47,15 +49,16 @@ try {
       positionals.length !== 1 ||
       values.version ||
       (values.daemon && command !== 'start') ||
-      (values.config && !['start', 'init-oss'].includes(command))
+      (values.config && !['start', 'init-oss', 'passwd'].includes(command))
     )
       throw new Error('Invalid arguments; see pmem --help');
     const path = expandPath(values.config ?? defaultConfigPath());
     if (command === 'start') {
       const settings = await loadConfig(path);
       if (values.daemon) await startDaemon(fileURLToPath(import.meta.url), path);
-      else await runService(settings);
+      else await runService(settings, path);
     } else if (command === 'stop') await stopService();
+    else if (command === 'passwd') await changePassword(path);
     else if (command === 'key') console.log(randomBytes(32).toString('hex'));
     else if (command === 'hash-password') {
       if (process.stdin.isTTY)

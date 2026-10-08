@@ -1,10 +1,11 @@
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { mkdtemp, readFile, readdir, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { createApp } from './app';
 import { hashPassword } from './auth';
+import * as auth from './auth';
 import { config } from './config';
 import { LocalStore } from './local';
 let root: string;
@@ -114,6 +115,34 @@ it('rejects old cookies after only the password hash changes', async () => {
       })
     ).statusCode,
   ).toBe(401);
+});
+it('rejects a login whose password was changed while verification was in flight', async () => {
+  const { app, cfg } = await setup();
+  const nextHash = await hashPassword('replacement-password-123');
+  let resolve!: (valid: boolean) => void;
+  const pending = new Promise<boolean>((done) => {
+    resolve = done;
+  });
+  const check = vi.spyOn(auth, 'checkPassword').mockImplementationOnce(() => pending);
+  try {
+    const login = app
+      .inject({
+        method: 'POST',
+        url: '/api/v1/auth/login',
+        headers: { origin: cfg.origin },
+        payload: { account: 'me', password: 'test-password-12345' },
+      })
+      .then((response) => response);
+    await vi.waitFor(() => expect(check).toHaveBeenCalled());
+    app.updatePasswordHash(nextHash);
+    resolve(true);
+    const response = await login;
+    expect(response.statusCode).toBe(401);
+    expect(response.headers['set-cookie']).toBeUndefined();
+  } finally {
+    resolve(false);
+    check.mockRestore();
+  }
 });
 it('rejects oversized, invalid UTF-8, malformed IDs and symlink notes', async () => {
   const { app, headers } = await setup();

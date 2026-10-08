@@ -153,7 +153,15 @@ it('does not signal an unrelated process referenced by a stale record', async ()
   expect(process.kill(process.pid, 0)).toBe(true);
   await rm(record);
 });
-it.each([['start', '--bogus'], ['start', '-c'], ['stop', '-d'], ['start', 'extra'], ['unknown']])(
+it.each([
+  ['start', '--bogus'],
+  ['start', '-c'],
+  ['stop', '-d'],
+  ['start', 'extra'],
+  ['unknown'],
+  ['passwd', '-d'],
+  ['passwd', 'secret'],
+])(
   'rejects invalid CLI arguments: %j',
   async (...args) => {
     expect((await cli(args)).code).toBe(1);

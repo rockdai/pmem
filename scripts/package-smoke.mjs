@@ -77,6 +77,7 @@ try {
   assert.equal(await cli(['--version']), '0.1.0');
   const help = await cli(['--help']);
   assert.match(help, /~\/\.pmem\/pmem.json/);
+  assert.match(help, /pmem passwd/);
   const examplePath = join(packageRoot, 'pmem.example.json');
   assert.ok(help.includes(examplePath));
   assert.equal(JSON.parse(await readFile(examplePath, 'utf8')).storage, 'local');
