@@ -122,14 +122,44 @@ it.each([
     'oss-cn-shanghai-internal.aliyuncs.com:443',
     'https://oss-cn-shanghai-internal.aliyuncs.com',
   ],
-])('loads an explicit OSS endpoint from JSON: %s', async (endpoint, expected) => {
+])('loads an OSS endpoint without a region from JSON: %s', async (endpoint, expected) => {
   const path = join(root, 'pmem.json');
   await writeFile(
     path,
-    JSON.stringify({ ...base, storage: 'oss', oss: { ...oss, endpoint } }),
+    JSON.stringify({ ...base, storage: 'oss', oss: { ...oss, region: undefined, endpoint } }),
   );
-  expect((await loadConfig(path)).oss?.endpoint).toBe(expected);
+  const result = (await loadConfig(path)).oss;
+  expect(result?.endpoint).toBe(expected);
+  expect(result?.region).toBeUndefined();
 });
+it('accepts both an OSS region and an endpoint', () => {
+  const endpoint = 'https://oss-cn-hangzhou-internal.aliyuncs.com';
+  expect(config({ ...base, storage: 'oss', oss: { ...oss, endpoint } }).oss).toEqual({
+    ...oss,
+    endpoint,
+    prefix: '',
+  });
+});
+it('rejects an OSS config with neither region nor endpoint', async () => {
+  const path = join(root, 'pmem.json');
+  await writeFile(
+    path,
+    JSON.stringify({ ...base, storage: 'oss', oss: { ...oss, region: undefined } }),
+  );
+  await expect(loadConfig(path)).rejects.toThrow('oss.region or oss.endpoint is required');
+});
+it.each([null, true, 123, {}, [], '', '\0'])(
+  'rejects an invalid explicit OSS region even when an endpoint is supplied: %#',
+  (region) => {
+    expect(() =>
+      config({
+        ...base,
+        storage: 'oss',
+        oss: { ...oss, region, endpoint: 'https://oss-cn-hangzhou-internal.aliyuncs.com' },
+      }),
+    ).toThrow('Invalid or missing configuration: region');
+  },
+);
 it.each([
   null,
   true,

@@ -15,7 +15,7 @@ export interface Config {
   container: boolean;
   oss?: {
     bucket: string;
-    region: string;
+    region?: string;
     endpoint?: string;
     prefix: string;
     accessKeyId: string;
@@ -167,11 +167,14 @@ export function config(input: unknown, base = pmemHome()): Config {
           prefix.trim() !== prefix))
     )
       throw new Error('OSS prefix must be empty or a simple relative path ending in /');
+    const region = oss.region === undefined ? undefined : string(oss, 'region');
+    const endpoint = ossEndpoint(oss.endpoint);
+    if (!region && !endpoint) throw new Error('oss.region or oss.endpoint is required');
     value.oss = {
       prefix,
       bucket: string(oss, 'bucket'),
-      region: string(oss, 'region'),
-      endpoint: ossEndpoint(oss.endpoint),
+      region,
+      endpoint,
       accessKeyId: string(oss, 'accessKeyId'),
       accessKeySecret: string(oss, 'accessKeySecret'),
     };

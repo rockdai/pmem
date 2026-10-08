@@ -30,7 +30,7 @@ export class AliGateway implements ObjectGateway {
   readonly client: OSS;
   constructor(
     readonly bucket: string,
-    region: string,
+    region: string | undefined,
     accessKeyId: string,
     accessKeySecret: string,
     endpoint?: string,

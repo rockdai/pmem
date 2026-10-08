@@ -80,35 +80,41 @@ afterEach(async () => {
   await Promise.all(dirs.splice(0).map((p) => rm(p, { recursive: true, force: true })));
 });
 it.each([
-  [undefined, 'test-bucket.oss-cn-hangzhou.aliyuncs.com', undefined],
+  [undefined, 'test-bucket.oss-cn-hangzhou.aliyuncs.com', undefined, 'oss-cn-hangzhou'],
+  [undefined, 'test-bucket.oss-cn-shanghai.aliyuncs.com', undefined, 'oss-cn-shanghai'],
   [
     'oss-cn-hangzhou-internal.aliyuncs.com',
     'test-bucket.oss-cn-hangzhou-internal.aliyuncs.com',
+    undefined,
     undefined,
   ],
   [
     'https://oss-cn-hangzhou-internal.aliyuncs.com',
     'test-bucket.oss-cn-hangzhou-internal.aliyuncs.com',
+    undefined,
     undefined,
   ],
   [
     'https://oss-cn-shanghai-internal.aliyuncs.com',
     'test-bucket.oss-cn-shanghai-internal.aliyuncs.com',
     undefined,
+    'oss-cn-hangzhou',
   ],
   [
     'https://oss-cn-hangzhou-internal.aliyuncs.com',
     'test-bucket.oss-cn-hangzhou-internal.aliyuncs.com',
     '',
+    undefined,
   ],
   [
     'https://oss-cn-hangzhou-internal.aliyuncs.com',
     'test-bucket.oss-cn-hangzhou-internal.aliyuncs.com',
     'personal/',
+    undefined,
   ],
 ])(
-  'uses endpoint %s (host %s) and optional prefix %s for initialization, restart and CRUD',
-  async (endpoint, hostname, prefix) => {
+  'initializes, restarts and performs CRUD with endpoint %s, host %s, prefix %s and region %s',
+  async (endpoint, hostname, prefix, region) => {
     const objects = new Map<string, Buffer>();
     const request = vi
       .spyOn(transport, 'request')
@@ -156,7 +162,7 @@ it.each([
       stateDir: await temp(),
       oss: {
         bucket: 'test-bucket',
-        region: 'oss-cn-hangzhou',
+        region,
         prefix,
         endpoint,
         accessKeyId: 'id',
@@ -211,7 +217,6 @@ it.each([false, true])(
       stateDir: await temp(),
       oss: {
         bucket: 'test-bucket',
-        region: 'oss-cn-hangzhou',
         endpoint: 'oss-cn-hangzhou-internal.aliyuncs.com',
         accessKeyId: 'id',
         accessKeySecret: 'secret',
