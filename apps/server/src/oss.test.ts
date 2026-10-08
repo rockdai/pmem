@@ -325,11 +325,11 @@ it('logs bounded runtime diagnostics for each uncertainty stage and generic stor
     root = await temp();
   const store = await OssStore.open(gateway, root, 'test', 'pmem/', { initialize: true });
   const cfg = config({
-    PMEM_ACCOUNT: 'me',
-    PMEM_PASSWORD_HASH: await hashPassword('private-password'),
-    PMEM_SESSION_KEY: 'ab'.repeat(32),
-    PMEM_ORIGIN: 'http://localhost:3000',
-    PMEM_DATA_DIR: root,
+    account: 'me',
+    passwordHash: await hashPassword('private-password'),
+    sessionKey: 'ab'.repeat(32),
+    origin: 'http://localhost:3000',
+    dataDir: root,
   });
   const entries: RuntimeDiagnostic[] = [];
   const app = await createApp(cfg, store, '/no-web', (entry) => entries.push(entry));

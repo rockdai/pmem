@@ -5,7 +5,7 @@ import rateLimit from '@fastify/rate-limit';
 import staticFiles from '@fastify/static';
 import { createHmac, randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { MAX_BYTES, type SessionInfo } from '../../../packages/contracts/src/index';
 import { AppError, Notes, type Store } from './storage';
 import { binding, checkPassword, equal } from './auth';
@@ -21,7 +21,12 @@ declare module '@fastify/secure-session' {
 export async function createApp(
   config: Config,
   store: Store,
-  webRoot = resolve('dist/web'),
+  webRoot = fileURLToPath(
+    new URL(
+      existsSync(new URL('../web/index.html', import.meta.url)) ? '../web/' : '../../../dist/web/',
+      import.meta.url,
+    ),
+  ),
   diagnostic: DiagnosticSink = writeDiagnostic,
 ) {
   const app = Fastify({
