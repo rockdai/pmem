@@ -74,7 +74,7 @@ try {
     { env: npmEnv, maxBuffer: 1024 * 1024 },
   );
   if (installed.stderr) process.stderr.write(installed.stderr);
-  assert.equal(await cli(['--version']), '0.1.0');
+  assert.equal(await cli(['--version']), pack.version);
   const help = await cli(['--help']);
   assert.match(help, /~\/\.pmem\/pmem.json/);
   assert.match(help, /pmem passwd/);

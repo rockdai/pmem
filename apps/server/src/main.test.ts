@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import packageInfo from '../../../package.json' with { type: 'json' };
 let root: string, path: string, port: number;
 const children: ChildProcess[] = [];
 const entry = fileURLToPath(new URL('./cli.ts', import.meta.url));
@@ -169,7 +170,7 @@ it.each([
 );
 it('provides help and version without configuration', async () => {
   await rm(path);
-  expect((await cli(['--version'])).text.trim()).toBe('0.1.0');
+  expect((await cli(['--version'])).text.trim()).toBe(packageInfo.version);
   expect((await cli(['--help'])).text).toContain('~/.pmem/pmem.json');
   const missing = await cli(['start']);
   expect(missing.code).toBe(1);
