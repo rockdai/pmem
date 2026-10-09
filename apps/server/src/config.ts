@@ -67,7 +67,7 @@ function boolean(input: Record<string, unknown>, key: string): boolean {
     throw new Error(`${key} must be a boolean`);
   return input[key] === true;
 }
-function ossEndpoint(input: unknown): string | undefined {
+function ossEndpoint(input: unknown, bucket: string): string | undefined {
   if (input === undefined) return;
   const message =
     'oss.endpoint must be a hostname or HTTPS URL without credentials, path, query or fragment';
@@ -77,11 +77,23 @@ function ossEndpoint(input: unknown): string | undefined {
     !/^(?:https:\/\/)?[a-zA-Z0-9][a-zA-Z0-9.-]*(?::[0-9]+)?\/?$/.test(input)
   )
     throw new Error(message);
+  let endpoint: URL;
   try {
-    return new URL(input.startsWith('https://') ? input : `https://${input}`).origin;
+    endpoint = new URL(input.startsWith('https://') ? input : `https://${input}`);
   } catch {
     throw new Error(message);
   }
+  const bucketPrefix = `${bucket.toLowerCase()}.`;
+  if (
+    endpoint.hostname.startsWith(bucketPrefix) &&
+    /^(?:oss-[a-z0-9-]+|[a-z0-9-]+\.oss)\.aliyuncs\.com\.?$/.test(
+      endpoint.hostname.slice(bucketPrefix.length),
+    )
+  )
+    throw new Error(
+      'oss.endpoint must be an OSS service endpoint without the oss.bucket hostname prefix',
+    );
+  return endpoint.origin;
 }
 export function config(input: unknown, base = pmemHome()): Config {
   const values = object(input, 'Configuration');
@@ -167,12 +179,13 @@ export function config(input: unknown, base = pmemHome()): Config {
           prefix.trim() !== prefix))
     )
       throw new Error('OSS prefix must be empty or a simple relative path ending in /');
+    const bucket = string(oss, 'bucket');
     const region = oss.region === undefined ? undefined : string(oss, 'region');
-    const endpoint = ossEndpoint(oss.endpoint);
+    const endpoint = ossEndpoint(oss.endpoint, bucket);
     if (!region && !endpoint) throw new Error('oss.region or oss.endpoint is required');
     value.oss = {
       prefix,
-      bucket: string(oss, 'bucket'),
+      bucket,
       region,
       endpoint,
       accessKeyId: string(oss, 'accessKeyId'),

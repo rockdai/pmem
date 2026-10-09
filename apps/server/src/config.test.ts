@@ -140,6 +140,38 @@ it('accepts both an OSS region and an endpoint', () => {
     prefix: '',
   });
 });
+it.each([
+  ['test-bucket', 'test-bucket.oss-cn-hangzhou.aliyuncs.com'],
+  ['test-bucket', 'https://test-bucket.oss-cn-hangzhou.aliyuncs.com'],
+  ['test-bucket', 'test-bucket.oss-cn-hangzhou-internal.aliyuncs.com'],
+  ['test-bucket', 'https://test-bucket.oss-cn-hangzhou-internal.aliyuncs.com/'],
+  ['test-bucket', 'https://TEST-BUCKET.OSS-CN-HANGZHOU-INTERNAL.ALIYUNCS.COM:443/'],
+  ['test-bucket', 'test-bucket.oss-cn-hangzhou-internal.aliyuncs.com.:8443'],
+  ['another-bucket', 'https://another-bucket.oss-cn-shanghai-internal.aliyuncs.com:8443'],
+  ['test-bucket', 'https://test-bucket.oss-accelerate.aliyuncs.com'],
+  ['test-bucket', 'https://test-bucket.cn-hangzhou.oss.aliyuncs.com'],
+])('rejects a bucket-qualified OSS endpoint for %s: %s', async (bucket, endpoint) => {
+  const path = join(root, 'pmem.json');
+  for (const region of [undefined, oss.region]) {
+    await writeFile(
+      path,
+      JSON.stringify({ ...base, storage: 'oss', oss: { ...oss, bucket, region, endpoint } }),
+    );
+    await expect(loadConfig(path)).rejects.toThrow(
+      /^oss\.endpoint must be an OSS service endpoint without the oss\.bucket hostname prefix$/,
+    );
+  }
+});
+it.each([
+  ['oss', 'oss-cn-hangzhou.aliyuncs.com'],
+  ['oss-cn-hangzhou', 'oss-cn-hangzhou.aliyuncs.com'],
+  ['oss-cn-hangzhou-internal', 'oss-cn-hangzhou-internal.aliyuncs.com'],
+  ['cn-hangzhou', 'cn-hangzhou.oss.aliyuncs.com'],
+])('accepts a service endpoint whose name overlaps with bucket %s', (bucket, endpoint) => {
+  expect(
+    config({ ...base, storage: 'oss', oss: { ...oss, bucket, region: undefined, endpoint } }).oss,
+  ).toMatchObject({ bucket, endpoint: `https://${endpoint}` });
+});
 it('rejects an OSS config with neither region nor endpoint', async () => {
   const path = join(root, 'pmem.json');
   await writeFile(
