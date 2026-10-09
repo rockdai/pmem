@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/core';
 import { canEdit, createEditor, safeLink } from './editor';
 import type { NoteController, ViewState } from './controller';
+import { focusAfterCodeBlock } from './code-block';
 const actions = [
   ['正文', (e: Editor) => e.chain().focus().setParagraph().run()],
   ['标题 1', (e: Editor) => e.chain().focus().toggleHeading({ level: 1 }).run()],
@@ -160,7 +161,23 @@ export function EditorView({
           <textarea aria-label="笔记原文" readOnly value={raw} />
         </div>
       )}
-      <div className={raw !== null ? 'hidden' : 'editor-page'}>
+      <div
+        className={raw !== null ? 'hidden' : 'editor-page'}
+        onMouseDown={(event) => {
+          const e = editor.current;
+          if (!e || event.target !== event.currentTarget || event.button !== 0) return;
+          const last = e.state.doc.lastChild;
+          if (last?.type.name !== 'codeBlock') return;
+          const position = e.state.doc.content.size - last.nodeSize;
+          const dom = e.view.nodeDOM(position);
+          if (
+            dom instanceof HTMLElement &&
+            event.clientY >= dom.getBoundingClientRect().bottom &&
+            focusAfterCodeBlock(e, position)
+          )
+            event.preventDefault();
+        }}
+      >
         <div ref={host} />
       </div>
     </>
@@ -175,7 +192,7 @@ function HistoryIcon({ redo = false }: { redo?: boolean }) {
       viewBox="0 0 18 18"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.75"
+      strokeWidth="1.25"
       strokeLinecap="round"
       strokeLinejoin="round"
       style={redo ? { transform: 'scaleX(-1)' } : undefined}

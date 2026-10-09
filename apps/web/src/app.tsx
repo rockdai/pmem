@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   NOTE_ID,
-  noteTitle,
   type NotePage,
   type NoteSummary,
   type SessionInfo,
@@ -9,7 +8,8 @@ import {
 import { Api, HttpError } from './api';
 import { Drafts, acquireSlot, removeOrphan, uuid, type Draft, type DraftStore } from './drafts';
 import { NoteController, type ViewState } from './controller';
-import { EditorView } from './EditorView';
+import { EditorView } from './editor-view';
+import { formatDate, formatTime } from './date-time';
 
 function Login({
   onLogin,
@@ -182,6 +182,18 @@ function Workspace({
       current.current = next;
       all.current.add(next);
       next.onSynced = () => {
+        if (next.view().deleted && current.current === next) {
+          sequence.current++;
+          next.detach();
+          current.current = null;
+          setController(null);
+          setView(null);
+          setOpening(false);
+          setRemote(null);
+          setError('');
+          history.replaceState(null, '', location.pathname + location.search);
+          localStorage.removeItem(`pmem-last:${namespace}`);
+        }
         void refreshList();
         void refreshDrafts();
       };
@@ -383,7 +395,6 @@ function Workspace({
           setError('删除尚未完成，请先处理保存状态。');
           return;
         }
-        if (existing === current.current) newNote();
       } else {
         const etag = (await api.call(`/notes/${id}`)).headers.get('etag') ?? '';
         await api.call(`/notes/${id}`, { method: 'DELETE', headers: { 'if-match': etag } });
@@ -494,7 +505,6 @@ function Workspace({
     else await removeOrphan(db, source);
     await refreshDrafts();
   }
-  const title = controller?.draft.body ? noteTitle(controller.draft.body) : '新的想法';
   return (
     <div className="workspace">
       <aside className={`sidebar ${sidebar ? 'open' : ''}`}>
@@ -521,7 +531,7 @@ function Workspace({
             >
               <button className="note-open" onClick={() => void openNote(note.id)}>
                 <span>{note.title}</span>
-                <small>{new Date(note.modified).toLocaleDateString()}</small>
+                <small>{formatDate(note.modified)}</small>
               </button>
               <button
                 className="note-more"
@@ -582,7 +592,7 @@ function Workspace({
         />
       )}
       <main className="main-panel">
-        <header className="note-header">
+        <header className="note-header mobile-only">
           <button
             className="mobile-only"
             aria-label="打开笔记列表"
@@ -590,9 +600,6 @@ function Workspace({
           >
             ☰
           </button>
-          <div className="breadcrumb">
-            笔记本 <span>/</span> {title}
-          </div>
         </header>
         {error && (
           <div className="notice" role="alert">
@@ -683,7 +690,9 @@ function Workspace({
               <div className="draft-row" key={d.key}>
                 <div>
                   {d.body.slice(0, 80) || '空白草稿'}
-                  <small>{new Date(d.modified).toLocaleString()}</small>
+                  <small>
+                    {formatDate(d.modified)} {formatTime(d.modified)}
+                  </small>
                 </div>
                 <button
                   onClick={() => void restore(d).catch(() => setError('恢复失败，原草稿仍保留。'))}

@@ -4,6 +4,7 @@ import { Markdown } from '@tiptap/markdown';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import HardBreak from '@tiptap/extension-hard-break';
+import { NoteCodeBlock } from './code-block';
 
 export const safeLink = (href: string) => /^(https?:\/\/|mailto:)/i.test(href);
 export function extensions() {
@@ -14,6 +15,7 @@ export function extensions() {
       underline: false,
       trailingNode: false,
       hardBreak: false,
+      codeBlock: false,
       link: {
         openOnClick: false,
         autolink: false,
@@ -22,6 +24,7 @@ export function extensions() {
       },
     }),
     HardBreak,
+    NoteCodeBlock,
     TaskList,
     TaskItem.configure({ nested: true }),
     Markdown.configure({ markedOptions: { gfm: true } }),

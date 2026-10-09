@@ -1,6 +1,7 @@
 import { MAX_BYTES } from '../../../packages/contracts/src/index';
 import { Api, HttpError } from './api';
 import { type DraftStore, type Draft, type Submission } from './drafts';
+import { formatTime } from './date-time';
 export interface ViewState {
   body: string;
   status: string;
@@ -26,6 +27,7 @@ export class NoteController {
   private localFailed = false;
   private remote?: string;
   private stopped = false;
+  private syncedAt = Date.now();
   onView: (view: ViewState) => void = () => {};
   onSynced: () => void = () => {};
   onAuth: () => void = () => {};
@@ -67,7 +69,7 @@ export class NoteController {
             : this.dirty
               ? '已保存到本机，待同步'
               : this.draft.base
-                ? '已同步'
+                ? `已同步 ${formatTime(this.syncedAt)}`
                 : '开始记录你的想法',
     };
   }
@@ -252,6 +254,7 @@ export class NoteController {
       }, 500);
   }
   private async ack(sent: Submission, etag: string) {
+    this.syncedAt = Date.now();
     this.draft.base = etag;
     this.draft.retry = undefined;
     this.draft.pending = undefined;
@@ -381,6 +384,7 @@ export class NoteController {
         this.draft.body = body;
         this.draft.base = etag;
         await this.db.clean(this.draft.namespace, this.draft.id, body, etag);
+        this.syncedAt = Date.now();
       }
     } catch (error) {
       if (error instanceof HttpError && [401, 404].includes(error.status)) {
@@ -430,6 +434,7 @@ export class NoteController {
       await job;
       this.localRev = applied;
       this.localFailed = false;
+      this.syncedAt = Date.now();
     } catch (e) {
       this.localFailed = true;
       throw e;

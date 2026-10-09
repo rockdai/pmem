@@ -26,10 +26,14 @@ test('an opted-in plaintext HTTP origin supports login, writing, reload and dele
     }, `/api/v1/notes/${id}`);
   const editor = await enter(page);
   expect(
-    await page.evaluate(() => [isSecureContext, typeof crypto.randomUUID, typeof navigator.locks]),
+    await page.evaluate(() => [
+      isSecureContext,
+      typeof crypto.randomUUID,
+      typeof navigator.locks,
+    ]),
   ).toEqual([false, 'undefined', 'undefined']);
   await editor.fill('内网明文访问也能记录');
-  await expect(page.getByText('已同步', { exact: true })).toBeVisible();
+  await expect(page.getByText(/^已同步 \d{2}:\d{2}:\d{2}$/)).toBeVisible();
   const id = page.url().split('/').at(-1)!;
   expect((await remote(id)).body).toContain('内网明文访问也能记录');
   await page.reload();
@@ -58,14 +62,37 @@ test('a draft left unsynced by an earlier load can be restored and then discarde
   const banner = page.getByRole('button', { name: /有未同步的本机草稿/ });
   await banner.click();
   const rows = page.getByRole('dialog', { name: '恢复本机草稿' }).locator('.draft-row');
-  await rows.filter({ hasText: '刷新前还没同步' }).getByRole('button', { name: '恢复' }).click();
+  await rows
+    .filter({ hasText: '刷新前还没同步' })
+    .getByRole('button', { name: '恢复' })
+    .click();
   await expect(editor).toHaveText('刷新前还没同步');
   offline = false;
-  await expect(page.getByText('已同步', { exact: true })).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText(/^已同步 \d{2}:\d{2}:\d{2}$/)).toBeVisible({ timeout: 10000 });
   await banner.click();
   await expect(rows).toHaveCount(1);
   page.once('dialog', (dialog) => dialog.accept());
   await rows.getByRole('button', { name: '丢弃' }).click();
   await expect(rows).toHaveCount(0);
   await expect(banner).toHaveCount(0);
+});
+
+test('code can be copied on an opted-in plaintext HTTP origin', async ({ page }) => {
+  const editor = await enter(page);
+  await editor.fill('const answer = 42;');
+  await page.getByLabel('段落格式').selectOption({ label: '代码块' });
+  await expect(editor.locator('pre code')).toHaveText('const answer = 42;');
+  await page.evaluate(() => {
+    document.addEventListener('copy', () => {
+      const field = document.activeElement;
+      if (field instanceof HTMLTextAreaElement)
+        document.documentElement.dataset.copied = field.value;
+    });
+  });
+  await page.getByRole('button', { name: '复制代码' }).click();
+  await expect(page.getByText('已复制', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.dataset.copied)).toBe(
+    'const answer = 42;',
+  );
+  await expect(page.locator('body > textarea')).toHaveCount(0);
 });

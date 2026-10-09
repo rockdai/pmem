@@ -108,7 +108,7 @@ test('production cold and warm navigation, actual input and durable recovery', a
               .reduce((n, r) => n + (r as PerformanceResourceTiming).transferSize, 0),
           };
         });
-        await expect(page.getByText('已同步', { exact: true })).toBeVisible();
+        await expect(page.getByText(/^已同步 \d{2}:\d{2}:\d{2}$/)).toBeVisible();
         await page.reload();
         await expect(editor).toContainText(marker);
         records.push({ ready, ...metrics });
