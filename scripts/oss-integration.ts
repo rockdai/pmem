@@ -21,8 +21,8 @@ if (!/^test-[a-zA-Z0-9_-]+\/$/.test(prefix) || prefix === settings.oss.prefix)
   throw new Error(
     'Test prefix must be test-<unique-name>/ and distinct from the application prefix',
   );
-const { bucket, region, accessKeyId, accessKeySecret } = settings.oss;
-const gateway = new AliGateway(bucket, region, accessKeyId, accessKeySecret);
+const { bucket, region, endpoint, accessKeyId, accessKeySecret } = settings.oss;
+const gateway = new AliGateway(bucket, region, accessKeyId, accessKeySecret, endpoint);
 const root = await mkdtemp(join(tmpdir(), 'pmem-oss-live-')),
   id = crypto.randomUUID();
 let initialized = false;

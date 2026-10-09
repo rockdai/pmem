@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Editor } from '@tiptap/core';
-import { canEdit, extensions } from './editor';
+import type { Editor } from '@tiptap/core';
+import { canEdit, createEditor } from './editor';
 import { focusAfterCodeBlock } from './code-block';
 const live: Editor[] = [];
 function selectAll(editor: Editor, shortcut: string) {
@@ -16,9 +16,11 @@ function selectAll(editor: Editor, shortcut: string) {
   );
 }
 function make(content: string) {
-  const editor = new Editor({ extensions: extensions(), content, contentType: 'markdown' });
+  const element = document.createElement('div');
+  const editor = createEditor(element, () => {});
+  editor.commands.setContent(content, { contentType: 'markdown', emitUpdate: false });
   live.push(editor);
-  return editor;
+  return { editor, element };
 }
 afterEach(() => {
   live.splice(0).forEach((e) => e.destroy());
@@ -27,31 +29,115 @@ afterEach(() => {
 });
 describe('Markdown content boundary', () => {
   it.each([
-    '# 灵感\n\n中文 **加粗** 与 *斜体* [链接](https://example.com) 和 `code`',
-    '- first\n- second\n\n1. 中文\n2. other',
-    '- [ ] 待办\n- [x] 完成',
-    '> 引用\n>\n> 下一段',
-    '第一行  \n第二行\n\n下一段',
-    '```js\n  const x = 1;\n\n  // 尾部空格  \n\n```',
-    'literal & <tag>\n\n\\*普通星号\\*',
-  ])('preserves supported semantics: %s', (markdown) => {
-    const editor = make(markdown);
-    const before = editor.getJSON();
+    {
+      name: 'headings, emphasis, links and inline code',
+      markdown: '# 灵感\n\n中文 **加粗** 与 *斜体* [链接](https://example.com) 和 `code`',
+      check(element: HTMLElement) {
+        expect(element.textContent).toBe('灵感中文 加粗 与 斜体 链接 和 code');
+        expect(element.querySelectorAll('h1')).toHaveLength(1);
+        expect(element.querySelectorAll('p')).toHaveLength(1);
+        expect(element.querySelector('h1')?.textContent).toBe('灵感');
+        expect(element.querySelector('strong')?.textContent).toBe('加粗');
+        expect(element.querySelector('em')?.textContent).toBe('斜体');
+        expect(element.querySelector('a')?.textContent).toBe('链接');
+        expect(element.querySelector('a')?.getAttribute('href')).toBe('https://example.com');
+        expect(element.querySelector('code')?.textContent).toBe('code');
+      },
+    },
+    {
+      name: 'unordered and ordered lists',
+      markdown: '- first\n- second\n\n1. 中文\n2. other',
+      check(element: HTMLElement) {
+        expect(element.querySelectorAll('ul')).toHaveLength(1);
+        expect(element.querySelectorAll('ol')).toHaveLength(1);
+        expect([...element.querySelectorAll('ul > li')].map((li) => li.textContent)).toEqual([
+          'first',
+          'second',
+        ]);
+        expect([...element.querySelectorAll('ol > li')].map((li) => li.textContent)).toEqual([
+          '中文',
+          'other',
+        ]);
+      },
+    },
+    {
+      name: 'unchecked and checked tasks',
+      markdown: '- [ ] 待办\n- [x] 完成',
+      check(element: HTMLElement) {
+        const tasks = [...element.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+        expect(tasks.map((input) => input.checked)).toEqual([false, true]);
+        expect(tasks.map((input) => input.closest('li')?.querySelector('p')?.textContent)).toEqual([
+          '待办',
+          '完成',
+        ]);
+      },
+    },
+    {
+      name: 'multi-paragraph quotes',
+      markdown: '> 引用\n>\n> 下一段',
+      check(element: HTMLElement) {
+        expect(element.querySelectorAll('blockquote')).toHaveLength(1);
+        expect(element.textContent).toBe('引用下一段');
+        expect([...element.querySelectorAll('blockquote > p')].map((p) => p.textContent)).toEqual([
+          '引用',
+          '下一段',
+        ]);
+      },
+    },
+    {
+      name: 'hard breaks and separate paragraphs',
+      markdown: '第一行  \n第二行\n\n下一段',
+      check(element: HTMLElement) {
+        expect([...element.querySelectorAll('p')].map((p) => p.textContent)).toEqual([
+          '第一行第二行',
+          '下一段',
+        ]);
+        const breaks = element.querySelectorAll('br');
+        expect(breaks).toHaveLength(1);
+        expect(breaks[0].previousSibling?.textContent).toBe('第一行');
+        expect(breaks[0].nextSibling?.textContent).toBe('第二行');
+      },
+    },
+    {
+      name: 'literal punctuation and escaped formatting',
+      markdown: 'literal & \\<tag\\>\n\n\\*普通星号\\*',
+      check(element: HTMLElement) {
+        expect([...element.querySelectorAll('p')].map((p) => p.textContent)).toEqual([
+          'literal & <tag>',
+          '*普通星号*',
+        ]);
+        expect(element.querySelector('tag, em, strong')).toBeNull();
+      },
+    },
+  ])('renders and exports $name', ({ markdown, check }) => {
+    const { editor, element } = make(markdown);
+    expect(canEdit(editor, markdown)).toBe(true);
+    check(element);
     const output = editor.getMarkdown();
-    editor.commands.setContent(output, { contentType: 'markdown', emitUpdate: false });
-    expect(editor.getJSON()).toEqual(before);
+    const reopened = make(output);
+    expect(canEdit(reopened.editor, output)).toBe(true);
+    check(reopened.element);
   });
-  it('preserves code block whitespace', () => {
-    const editor = make('```\n  abc  \n\n\n```');
-    expect((editor.getJSON().content?.[0].content?.[0] as { text: string }).text).toBe(
-      '  abc  \n\n',
-    );
-    expect(editor.getMarkdown()).toContain('  abc  \n\n');
+  it.each([
+    ['', '  abc  \n\n'],
+    ['js', '  const x = 1;\n\n  // 尾部空格  \n'],
+  ])('preserves code block language %s and whitespace', (language, content) => {
+    const markdown = `\`\`\`${language}\n${content}\n\`\`\``;
+    const { editor, element } = make(markdown);
+    expect(canEdit(editor, markdown)).toBe(true);
+    expect(element.querySelectorAll('pre')).toHaveLength(1);
+    expect(element.querySelector('pre code')?.textContent).toBe(content);
+    const output = editor.getMarkdown();
+    expect(output).toBe(markdown);
+    const reopened = make(output);
+    expect(canEdit(reopened.editor, output)).toBe(true);
+    expect(reopened.element.querySelector('pre code')?.textContent).toBe(content);
   });
   it('rejects unknown structures and raw HTML before parsing', () => {
-    const editor = make('');
+    const { editor } = make('');
     for (const md of [
       '<script>alert(1)</script>',
+      'literal & <tag>',
       '| a | b |\n| - | - |\n| c | d |',
       '![image](https://example.com/a.png)',
       '[evil](javascript:alert(1))',
@@ -64,7 +150,7 @@ describe('Markdown content boundary', () => {
 
 describe('code block interactions', () => {
   it.each(['Ctrl-a', 'Meta-a'])('selects only the current code block with %s', (shortcut) => {
-    const editor = make('before\n\n```js\n  first\nsecond  \n```\n\nafter');
+    const { editor } = make('before\n\n```js\n  first\nsecond  \n```\n\nafter');
     const start = editor.state.doc.firstChild!.nodeSize + 1;
     editor.commands.setTextSelection(start + 3);
     selectAll(editor, shortcut);
@@ -77,7 +163,7 @@ describe('code block interactions', () => {
   });
 
   it('keeps normal select-all outside code and handles empty code', () => {
-    const editor = make('before\n\n```\n\n```');
+    const { editor } = make('before\n\n```\n\n```');
     editor.commands.setTextSelection(1);
     selectAll(editor, 'Ctrl-a');
     expect(editor.state.selection.from).toBe(0);
@@ -90,7 +176,7 @@ describe('code block interactions', () => {
   });
 
   it('collapses and expands without changing Markdown or firing a content update', async () => {
-    const editor = make('```js\n  const x = 1;\n\n```');
+    const { editor } = make('```js\n  const x = 1;\n\n```');
     const before = editor.getMarkdown();
     const changed = vi.fn();
     editor.on('update', changed);
@@ -114,7 +200,7 @@ describe('code block interactions', () => {
       userAgent: navigator.userAgent,
       clipboard: { writeText },
     });
-    const editor = make('```\nold\n```');
+    const { editor } = make('```\nold\n```');
     editor.commands.setTextSelection({ from: 1, to: 4 });
     editor.commands.insertContent('  new\nline  ');
     const [collapse, copy] = editor.view.dom.querySelectorAll<HTMLButtonElement>('button');
@@ -139,27 +225,32 @@ describe('code block interactions', () => {
       userAgent: navigator.userAgent,
     });
     const copy = vi.fn().mockReturnValueOnce(true).mockReturnValueOnce(false);
+    const original = Object.getOwnPropertyDescriptor(document, 'execCommand');
     Object.defineProperty(document, 'execCommand', { configurable: true, value: copy });
-    const editor = make('```\n\n```');
-    const button = editor.view.dom.querySelectorAll<HTMLButtonElement>('button')[1];
-    button.click();
-    await vi.waitFor(() =>
-      expect(editor.view.dom.querySelector('[role=status]')!.textContent).toBe('已复制'),
-    );
-    button.click();
-    await vi.waitFor(() =>
-      expect(editor.view.dom.querySelector('[role=status]')!.textContent).toBe(
-        '复制失败，请重试',
-      ),
-    );
-    expect(document.querySelector('textarea')).toBeNull();
-    Reflect.deleteProperty(document, 'execCommand');
+    try {
+      const { editor } = make('```\n\n```');
+      const button = editor.view.dom.querySelectorAll<HTMLButtonElement>('button')[1];
+      button.click();
+      await vi.waitFor(() =>
+        expect(editor.view.dom.querySelector('[role=status]')!.textContent).toBe('已复制'),
+      );
+      button.click();
+      await vi.waitFor(() =>
+        expect(editor.view.dom.querySelector('[role=status]')!.textContent).toBe(
+          '复制失败，请重试',
+        ),
+      );
+      expect(document.querySelector('textarea')).toBeNull();
+    } finally {
+      if (original) Object.defineProperty(document, 'execCommand', original);
+      else Reflect.deleteProperty(document, 'execCommand');
+    }
   });
 
   it.each(['', '\n\nafter', '\n\n```\nnext\n```'])(
     'enters a paragraph after code without changing nearby blocks: %s',
     (suffix) => {
-      const editor = make(`\`\`\`\ncode\n\`\`\`${suffix}`);
+      const { editor } = make(`\`\`\`\ncode\n\`\`\`${suffix}`);
       const first = editor.state.doc.firstChild!;
       expect(focusAfterCodeBlock(editor, 0)).toBe(true);
       expect(editor.state.selection.$from.parent.type.name).toBe('paragraph');
@@ -176,7 +267,7 @@ describe('code block interactions', () => {
   );
 
   it('does not insert paragraphs in a read-only editor', () => {
-    const editor = make('```\ncode\n```');
+    const { editor } = make('```\ncode\n```');
     editor.setEditable(false);
     expect(focusAfterCodeBlock(editor, 0)).toBe(false);
     expect(editor.state.doc.childCount).toBe(1);

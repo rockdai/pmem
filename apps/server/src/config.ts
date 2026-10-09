@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { isIP } from 'node:net';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 export interface Config {
@@ -15,7 +16,8 @@ export interface Config {
   container: boolean;
   oss?: {
     bucket: string;
-    region: string;
+    region?: string;
+    endpoint?: string;
     prefix: string;
     accessKeyId: string;
     accessKeySecret: string;
@@ -65,6 +67,36 @@ function boolean(input: Record<string, unknown>, key: string): boolean {
   if (input[key] !== undefined && typeof input[key] !== 'boolean')
     throw new Error(`${key} must be a boolean`);
   return input[key] === true;
+}
+function ossEndpoint(input: unknown, bucket: string): string | undefined {
+  if (input === undefined) return;
+  const message =
+    'oss.endpoint must be a hostname or HTTPS URL without credentials, path, query or fragment';
+  if (
+    typeof input !== 'string' ||
+    input.trim() !== input ||
+    !/^(?:https:\/\/)?[a-zA-Z0-9][a-zA-Z0-9.-]*(?::[0-9]+)?\/?$/.test(input)
+  )
+    throw new Error(message);
+  let endpoint: URL;
+  try {
+    endpoint = new URL(input.startsWith('https://') ? input : `https://${input}`);
+  } catch {
+    throw new Error(message);
+  }
+  if (isIP(endpoint.hostname))
+    throw new Error('oss.endpoint must use a DNS hostname instead of an IP address');
+  const bucketPrefix = `${bucket.toLowerCase()}.`;
+  if (
+    endpoint.hostname.startsWith(bucketPrefix) &&
+    /^(?:(?:vpc100-)?oss-[a-z0-9-]+|[a-z0-9-]+\.oss)\.aliyuncs\.com\.?$/.test(
+      endpoint.hostname.slice(bucketPrefix.length),
+    )
+  )
+    throw new Error(
+      'oss.endpoint must be an OSS service endpoint without the oss.bucket hostname prefix',
+    );
+  return endpoint.origin;
 }
 export function config(input: unknown, base = pmemHome()): Config {
   const values = object(input, 'Configuration');
@@ -129,17 +161,38 @@ export function config(input: unknown, base = pmemHome()): Config {
     const oss = object(values.oss, 'oss');
     if (
       Object.keys(oss).some(
-        (key) => !['prefix', 'bucket', 'region', 'accessKeyId', 'accessKeySecret'].includes(key),
+        (key) =>
+          ![
+            'prefix',
+            'bucket',
+            'region',
+            'endpoint',
+            'accessKeyId',
+            'accessKeySecret',
+          ].includes(key),
       )
     )
       throw new Error('Unknown oss configuration field');
-    const prefix = string(oss, 'prefix');
-    if (!/^[a-zA-Z0-9_-][a-zA-Z0-9_/-]*\/$/.test(prefix) || prefix.includes('//'))
-      throw new Error('OSS prefix must be a simple relative path ending in /');
+    const prefix = oss.prefix === undefined ? '' : oss.prefix;
+    if (
+      typeof prefix !== 'string' ||
+      (prefix !== '' &&
+        (!/^[a-zA-Z0-9_-][a-zA-Z0-9_/-]*\/$/.test(prefix) ||
+          prefix.includes('//') ||
+          prefix.trim() !== prefix))
+    )
+      throw new Error('OSS prefix must be empty or a simple relative path ending in /');
+    const bucket = string(oss, 'bucket');
+    const region = oss.region === undefined ? undefined : string(oss, 'region');
+    if (region !== undefined && !/^[a-zA-Z0-9_-]+$/.test(region))
+      throw new Error('oss.region must contain only letters, digits, underscores or hyphens');
+    const endpoint = ossEndpoint(oss.endpoint, bucket);
+    if (!region && !endpoint) throw new Error('oss.region or oss.endpoint is required');
     value.oss = {
       prefix,
-      bucket: string(oss, 'bucket'),
-      region: string(oss, 'region'),
+      bucket,
+      region,
+      endpoint,
       accessKeyId: string(oss, 'accessKeyId'),
       accessKeySecret: string(oss, 'accessKeySecret'),
     };

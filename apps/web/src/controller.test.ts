@@ -21,7 +21,7 @@ async function stop(c: NoteController) {
   });
   for (let i = 0; i < 1000 && !closed; i++) {
     await new Promise((resolve) => setImmediate(resolve));
-    await vi.advanceTimersByTimeAsync(10);
+    if (!closed) await vi.advanceTimersByTimeAsync(10);
   }
   await closing;
 }
@@ -118,30 +118,42 @@ it.each([null, '"previous"'])(
   },
 );
 it('late save acknowledgment preserves and persists a newer draft with the new baseline', async () => {
-  let finish!: (r: Response) => void,
-    calls = 0;
-  const { c, db } = await make(async () => {
-    calls++;
-    return new Promise((resolve) => {
-      finish = resolve;
-    });
-  });
+  let finish!: (r: Response) => void;
+  const fetcher = vi
+    .fn<typeof fetch>()
+    .mockImplementationOnce(
+      async () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    )
+    .mockResolvedValue(new Response(null, { status: 200, headers: { etag: '"latest"' } }));
+  const { c, db, api } = await make(fetcher);
   c.change('first', true);
   await c.durable();
   const saving = c.save();
-  await spin(() => calls === 1);
+  await spin(() => fetcher.mock.calls.length === 1);
   c.change('new input', true);
   await c.durable();
   await c.save();
-  expect(calls).toBe(1);
+  expect(fetcher).toHaveBeenCalledOnce();
   finish(new Response(null, { status: 201, headers: { etag: '"first"' } }));
   await saving;
   expect(c.view().body).toBe('new input');
   expect(c.view().dirty).toBe(true);
   const persisted = await db.get(c.draft.key);
   expect(persisted?.body).toBe('new input');
-  expect(persisted?.base).toBe('"first"');
-  expect(persisted?.pending).toBeUndefined();
+  await stop(c);
+  const restored = new NoteController(db, api, persisted!, true);
+  live.push(restored);
+  await restored.save();
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  const sent = fetcher.mock.calls[1][1];
+  expect(sent?.method).toBe('PUT');
+  expect(sent?.body).toBe('new input');
+  expect(new Headers(sent?.headers).get('if-match')).toBe('"first"');
+  expect(restored.view().dirty).toBe(false);
+  expect((await db.cached('test', c.draft.id))?.body).toBe('new input');
 });
 it('oversized drafts are retained without submitting, and shrinkage resumes saving', async () => {
   const fetcher = vi.fn(
@@ -240,15 +252,14 @@ it('a remote conflict never replaces the locally persisted text', async () => {
 });
 it('a read started before a successful save cannot restore its stale body', async () => {
   let finish!: (r: Response) => void;
-  const { c } = await make(
-    async (_url, init) =>
-      init?.method === 'PUT'
-        ? new Response(null, { status: 204, headers: { etag: '"new"' } })
-        : new Promise((resolve) => {
-            finish = resolve;
-          }),
-    '"base"',
+  const fetcher = vi.fn<typeof fetch>(async (_url, init) =>
+    init?.method === 'PUT'
+      ? new Response(null, { status: 204, headers: { etag: '"new"' } })
+      : new Promise((resolve) => {
+          finish = resolve;
+        }),
   );
+  const { c } = await make(fetcher, '"base"');
   const reading = c.refresh();
   await spin(() => Boolean(finish));
   c.change('new', true);
@@ -257,21 +268,27 @@ it('a read started before a successful save cannot restore its stale body', asyn
   finish(new Response('stale', { headers: { etag: '"stale"' } }));
   await reading;
   expect(c.view().body).toBe('new');
-  expect(c.draft.base).toBe('"new"');
   expect(c.view().dirty).toBe(false);
+  c.change('next edit', true);
+  await c.save();
+  expect(new Headers(fetcher.mock.lastCall?.[1]?.headers).get('if-match')).toBe('"new"');
+  expect(fetcher.mock.lastCall?.[1]?.body).toBe('next edit');
 });
 it('choosing remote content does not discard typing that arrives during the read', async () => {
   let finish!: (r: Response) => void;
   const { c, db } = await make(
-    async () =>
-      new Promise((resolve) => {
-        finish = resolve;
-      }),
+    async (_url, init) =>
+      init?.method === 'PUT'
+        ? new Response('{"error":"conflict"}', { status: 412 })
+        : new Promise((resolve) => {
+            finish = resolve;
+          }),
     '"base"',
   );
   c.change('draft', true);
-  c.draft.block = 'conflict';
   await c.durable();
+  await c.save();
+  expect(c.view().block).toBe('conflict');
   const reading = c.useRemote();
   await spin(() => Boolean(finish));
   c.change('new typing', true);
@@ -308,14 +325,18 @@ it('refreshes the session before releasing an auth-blocked draft, including new 
 it('repeated csrf rejection remains recoverable and keeps input arriving during renewal', async () => {
   let renew!: (r: Response) => void,
     reject = true;
-  const { c, db } = await make(async (url, init) => {
-    if (String(url).endsWith('/auth/session'))
+  const fetcher = vi.fn<typeof fetch>(async (url, init) => {
+    if (String(url).endsWith('/auth/session')) {
+      if (!reject) return Response.json({ account: 'me', deployment: 'test', csrf: 'renewed' });
       return new Promise((resolve) => {
         renew = resolve;
       });
+    }
     if (reject) return new Response('{"error":"csrf_rejected"}', { status: 403 });
+    if (!init?.method) return new Response(null, { status: 304 });
     return new Response(null, { status: 204, headers: { etag: '"saved"' } });
-  }, '"base"');
+  });
+  const { c, db } = await make(fetcher, '"base"');
   c.change('sent', true);
   await c.durable();
   const saving = c.save();
@@ -326,7 +347,12 @@ it('repeated csrf rejection remains recoverable and keeps input arriving during 
   await saving;
   expect(c.view().block).toBe('auth');
   expect((await db.get(c.draft.key))?.body).toBe('new typing');
-  expect(c.draft.pending).toBeUndefined();
+  reject = false;
+  await c.refresh();
+  await spin(() => !c.view().dirty);
+  expect(fetcher.mock.lastCall?.[1]?.method).toBe('PUT');
+  expect(fetcher.mock.lastCall?.[1]?.body).toBe('new typing');
+  expect(c.view().status).toMatch(/^已同步 \d{2}:\d{2}:\d{2}$/);
 });
 it('persists rate-limit deadlines across reload, backs off, and eventually saves the latest input', async () => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
@@ -345,32 +371,38 @@ it('persists rate-limit deadlines across reload, backs off, and eventually saves
   await c.durable();
   await c.save();
   expect(c.view().block).toBe('rate_limit');
-  expect(c.draft.pending).toBeUndefined();
+  const firstRejectedAt = Date.now();
   await stop(c);
   const restored = new NoteController(db, api, (await db.get(c.draft.key))!, true);
   live.push(restored);
+  let blockedAgain = false;
+  restored.onView = (view) => {
+    if (attempts === 2 && view.block === 'rate_limit') blockedAgain = true;
+  };
   restored.change('latest', true);
   await restored.durable();
   await restored.refresh();
   await restored.save();
-  await vi.advanceTimersByTimeAsync(2999);
+  await vi.advanceTimersByTimeAsync(firstRejectedAt + 2999 - Date.now());
   expect(fetcher).toHaveBeenCalledTimes(1);
   await vi.advanceTimersByTimeAsync(1);
-  await spin(() => restored.draft.retry?.attempts === 2);
+  await spin(() => blockedAgain);
   await restored.durable();
-  expect(restored.draft.retry!.at - Date.now()).toBe(2000);
+  const secondRejectedAt = Date.now();
   await stop(restored);
   const again = new NoteController(db, api, (await db.get(c.draft.key))!, true);
   live.push(again);
   await again.refresh();
-  await vi.advanceTimersByTimeAsync(1999);
+  await vi.advanceTimersByTimeAsync(secondRejectedAt + 1999 - Date.now());
   expect(fetcher).toHaveBeenCalledTimes(2);
   await vi.advanceTimersByTimeAsync(1);
   await spin(() => !again.view().dirty);
   expect(fetcher).toHaveBeenCalledTimes(3);
   expect(fetcher.mock.calls[2][1]?.body).toBe('latest');
-  expect(again.draft.retry).toBeUndefined();
+  expect(again.view().status).toMatch(/^已同步 \d{2}:\d{2}:\d{2}$/);
   expect(await db.get(c.draft.key)).toBeUndefined();
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(fetcher).toHaveBeenCalledTimes(3);
 });
 it.each([false, true])(
   'retries a rejected delete only if no new input arrived (%s)',
