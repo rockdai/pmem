@@ -46,9 +46,57 @@ async function make(fetcher: typeof fetch, base: string | null = null) {
   return { db, c, api };
 }
 async function spin(check: () => boolean) {
-  for (let i = 0; i < 1000 && !check(); i++) await new Promise((resolve) => setImmediate(resolve));
+  for (let i = 0; i < 1000 && !check(); i++)
+    await new Promise((resolve) => setImmediate(resolve));
   expect(check()).toBe(true);
 }
+it('shows a stable local sync time and advances it only after an acknowledgment', async () => {
+  const now = vi.spyOn(Date, 'now').mockReturnValue(new Date(2026, 9, 9, 9, 5, 2).getTime());
+  let finish!: (response: Response) => void;
+  const fetcher = vi.fn(
+    async () =>
+      new Promise<Response>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const { c } = await make(fetcher);
+  expect(c.view().status).toBe('开始记录你的想法');
+  c.change('first', true);
+  const saving = c.save();
+  await spin(() => fetcher.mock.calls.length === 1);
+  expect(c.view().status).not.toContain('已同步');
+  finish(new Response(null, { headers: { etag: '"first"' } }));
+  await saving;
+  expect(c.view().status).toBe('已同步 09:05:02');
+  now.mockReturnValue(new Date(2026, 9, 9, 10, 6, 7).getTime());
+  expect(c.view().status).toBe('已同步 09:05:02');
+  c.change('second', true);
+  const again = c.save();
+  await spin(() => fetcher.mock.calls.length === 2);
+  expect(c.view().status).not.toContain('已同步');
+  finish(new Response(null, { headers: { etag: '"second"' } }));
+  await again;
+  expect(c.view().status).toBe('已同步 10:06:07');
+});
+
+it('updates sync time on remote content reads and keeps it on unchanged polling', async () => {
+  const now = vi.spyOn(Date, 'now').mockReturnValue(new Date(2026, 9, 9, 0, 0, 0).getTime());
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(new Response('remote', { headers: { etag: '"remote"' } }))
+    .mockResolvedValueOnce(new Response(null, { status: 304 }))
+    .mockResolvedValueOnce(new Response('chosen', { headers: { etag: '"chosen"' } }));
+  const { c } = await make(fetcher, '"original"');
+  expect(c.view().status).toBe('已同步 00:00:00');
+  now.mockReturnValue(new Date(2026, 9, 9, 1, 2, 3).getTime());
+  await c.refresh();
+  expect(c.view().status).toBe('已同步 01:02:03');
+  now.mockReturnValue(new Date(2026, 9, 9, 4, 5, 6).getTime());
+  await c.refresh();
+  expect(c.view().status).toBe('已同步 01:02:03');
+  await c.useRemote();
+  expect(c.view().status).toBe('已同步 04:05:06');
+});
 it.each([null, '"previous"'])(
   'manual saving persists and syncs before debounce with base %s',
   async (base) => {
@@ -63,7 +111,7 @@ it.each([null, '"previous"'])(
       expect.objectContaining({ method: base ? 'PUT' : 'POST', body: '立即保存的文字' }),
     );
     expect((await db.cached('test', c.draft.id))?.body).toBe('立即保存的文字');
-    expect(c.view().status).toBe('已同步');
+    expect(c.view().status).toMatch(/^已同步 \d{2}:\d{2}:\d{2}$/);
     await c.save();
     await vi.advanceTimersByTimeAsync(2000);
     expect(fetcher).toHaveBeenCalledOnce();
@@ -96,7 +144,9 @@ it('late save acknowledgment preserves and persists a newer draft with the new b
   expect(persisted?.pending).toBeUndefined();
 });
 it('oversized drafts are retained without submitting, and shrinkage resumes saving', async () => {
-  const fetcher = vi.fn(async () => new Response(null, { status: 201, headers: { etag: '"ok"' } }));
+  const fetcher = vi.fn(
+    async () => new Response(null, { status: 201, headers: { etag: '"ok"' } }),
+  );
   const { c, db } = await make(fetcher);
   c.change('中'.repeat(700_000), true);
   await c.durable();
@@ -140,7 +190,9 @@ it('never retries an uncertain create when a read returns 404', async () => {
   expect(c.view().block).toBe('pending');
 });
 it('quota failure is not labeled saved and blocks dispatch until persistence is retried', async () => {
-  const fetcher = vi.fn(async () => new Response(null, { status: 201, headers: { etag: '"ok"' } }));
+  const fetcher = vi.fn(
+    async () => new Response(null, { status: 201, headers: { etag: '"ok"' } }),
+  );
   const { c, db } = await make(fetcher);
   vi.spyOn(db, 'put').mockRejectedValueOnce(new DOMException('Quota', 'QuotaExceededError'));
   c.change('keep in memory', true);
@@ -153,7 +205,9 @@ it('quota failure is not labeled saved and blocks dispatch until persistence is 
   expect(fetcher).toHaveBeenCalledOnce();
 });
 it('composition and blank new notes do not create files', async () => {
-  const fetcher = vi.fn(async () => new Response(null, { status: 201, headers: { etag: '"ok"' } }));
+  const fetcher = vi.fn(
+    async () => new Response(null, { status: 201, headers: { etag: '"ok"' } }),
+  );
   const { c } = await make(fetcher);
   c.change('', false);
   await c.durable();
@@ -325,7 +379,8 @@ it.each([false, true])(
     const methods: string[] = [];
     const { c } = await make(async (_url, init) => {
       methods.push(init?.method ?? 'GET');
-      if (methods.length === 1) return new Response('{"error":"rate_limited"}', { status: 429 });
+      if (methods.length === 1)
+        return new Response('{"error":"rate_limited"}', { status: 429 });
       return new Response(null, { status: 204, headers: { etag: '"saved"' } });
     }, '"base"');
     await c.remove();
