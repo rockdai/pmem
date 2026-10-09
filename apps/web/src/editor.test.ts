@@ -1,39 +1,108 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
-import { Editor } from '@tiptap/core';
-import { canEdit, extensions } from './editor';
+import type { Editor } from '@tiptap/core';
+import { canEdit, createEditor } from './editor';
 const live: Editor[] = [];
 function make(content: string) {
-  const editor = new Editor({ extensions: extensions(), content, contentType: 'markdown' });
+  const element = document.createElement('div');
+  const editor = createEditor(element, () => {});
+  editor.commands.setContent(content, { contentType: 'markdown', emitUpdate: false });
   live.push(editor);
-  return editor;
+  return { editor, element };
 }
 afterEach(() => live.splice(0).forEach((e) => e.destroy()));
 describe('Markdown content boundary', () => {
   it.each([
-    '# 灵感\n\n中文 **加粗** 与 *斜体* [链接](https://example.com) 和 `code`',
-    '- first\n- second\n\n1. 中文\n2. other',
-    '- [ ] 待办\n- [x] 完成',
-    '> 引用\n>\n> 下一段',
-    '第一行  \n第二行\n\n下一段',
-    '```js\n  const x = 1;\n\n  // 尾部空格  \n\n```',
-    'literal & <tag>\n\n\\*普通星号\\*',
-  ])('preserves supported semantics: %s', (markdown) => {
-    const editor = make(markdown);
-    const before = editor.getJSON();
+    {
+      name: 'headings, emphasis, links and inline code',
+      markdown: '# 灵感\n\n中文 **加粗** 与 *斜体* [链接](https://example.com) 和 `code`',
+      check(element: HTMLElement) {
+        expect(element.querySelector('h1')?.textContent).toBe('灵感');
+        expect(element.querySelector('strong')?.textContent).toBe('加粗');
+        expect(element.querySelector('em')?.textContent).toBe('斜体');
+        expect(element.querySelector('a')?.textContent).toBe('链接');
+        expect(element.querySelector('a')?.getAttribute('href')).toBe('https://example.com');
+        expect(element.querySelector('code')?.textContent).toBe('code');
+      },
+    },
+    {
+      name: 'unordered and ordered lists',
+      markdown: '- first\n- second\n\n1. 中文\n2. other',
+      check(element: HTMLElement) {
+        expect([...element.querySelectorAll('ul > li')].map((li) => li.textContent)).toEqual([
+          'first',
+          'second',
+        ]);
+        expect([...element.querySelectorAll('ol > li')].map((li) => li.textContent)).toEqual([
+          '中文',
+          'other',
+        ]);
+      },
+    },
+    {
+      name: 'unchecked and checked tasks',
+      markdown: '- [ ] 待办\n- [x] 完成',
+      check(element: HTMLElement) {
+        const tasks = [...element.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+        expect(tasks.map((input) => input.checked)).toEqual([false, true]);
+        expect(tasks.map((input) => input.closest('li')?.querySelector('p')?.textContent)).toEqual([
+          '待办',
+          '完成',
+        ]);
+      },
+    },
+    {
+      name: 'multi-paragraph quotes',
+      markdown: '> 引用\n>\n> 下一段',
+      check(element: HTMLElement) {
+        expect([...element.querySelectorAll('blockquote > p')].map((p) => p.textContent)).toEqual([
+          '引用',
+          '下一段',
+        ]);
+      },
+    },
+    {
+      name: 'hard breaks and separate paragraphs',
+      markdown: '第一行  \n第二行\n\n下一段',
+      check(element: HTMLElement) {
+        expect([...element.querySelectorAll('p')].map((p) => p.textContent)).toEqual([
+          '第一行第二行',
+          '下一段',
+        ]);
+        const breaks = element.querySelectorAll('br');
+        expect(breaks).toHaveLength(1);
+        expect(breaks[0].previousSibling?.textContent).toBe('第一行');
+        expect(breaks[0].nextSibling?.textContent).toBe('第二行');
+      },
+    },
+    {
+      name: 'literal punctuation and escaped formatting',
+      markdown: 'literal & <tag>\n\n\\*普通星号\\*',
+      check(element: HTMLElement) {
+        expect([...element.querySelectorAll('p')].map((p) => p.textContent)).toEqual([
+          'literal & <tag>',
+          '*普通星号*',
+        ]);
+        expect(element.querySelector('tag, em, strong')).toBeNull();
+      },
+    },
+  ])('renders and exports $name', ({ markdown, check }) => {
+    const { editor, element } = make(markdown);
+    check(element);
     const output = editor.getMarkdown();
-    editor.commands.setContent(output, { contentType: 'markdown', emitUpdate: false });
-    expect(editor.getJSON()).toEqual(before);
+    check(make(output).element);
   });
-  it('preserves code block whitespace', () => {
-    const editor = make('```\n  abc  \n\n\n```');
-    expect((editor.getJSON().content?.[0].content?.[0] as { text: string }).text).toBe(
-      '  abc  \n\n',
-    );
-    expect(editor.getMarkdown()).toContain('  abc  \n\n');
+  it.each([
+    ['', '  abc  \n\n'],
+    ['js', '  const x = 1;\n\n  // 尾部空格  \n'],
+  ])('preserves code block language %s and whitespace', (language, content) => {
+    const { editor, element } = make(`\`\`\`${language}\n${content}\n\`\`\``);
+    expect(element.querySelector('pre code')?.textContent).toBe(content);
+    expect(editor.getMarkdown()).toBe(`\`\`\`${language}\n${content}\n\`\`\``);
+    expect(make(editor.getMarkdown()).element.querySelector('pre code')?.textContent).toBe(content);
   });
   it('rejects unknown structures and raw HTML before parsing', () => {
-    const editor = make('');
+    const { editor } = make('');
     for (const md of [
       '<script>alert(1)</script>',
       '| a | b |\n| - | - |\n| c | d |',

@@ -1,7 +1,6 @@
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { createRequire } from 'node:module';
-import { Readable } from 'node:stream';
+import nock from 'nock';
 import { mkdtemp, rm, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -19,9 +18,12 @@ import { config } from './config';
 import { runtime } from './runtime';
 import { hashPassword } from './auth';
 import type { RuntimeDiagnostic } from './diagnostics';
-const transport = createRequire(import.meta.resolve('ali-oss'))('urllib') as {
-  request(url: string, options: { method: string; content?: Buffer }): Promise<unknown>;
-};
+const unexpectedRequests = vi.fn();
+beforeEach(() => {
+  unexpectedRequests.mockClear();
+  nock.disableNetConnect();
+  nock.emitter.on('no match', unexpectedRequests);
+});
 class MemoryGateway implements ObjectGateway {
   objects = new Map<string, ObjectData>();
   heads = 0;
@@ -76,8 +78,12 @@ async function temp() {
   return p;
 }
 afterEach(async () => {
+  nock.cleanAll();
+  nock.enableNetConnect();
+  nock.emitter.removeListener('no match', unexpectedRequests);
   vi.restoreAllMocks();
   await Promise.all(dirs.splice(0).map((p) => rm(p, { recursive: true, force: true })));
+  expect(unexpectedRequests).not.toHaveBeenCalled();
 });
 it.each([
   [undefined, 'test-bucket.oss-cn-hangzhou.aliyuncs.com', undefined, 'oss-cn-hangzhou'],
@@ -116,44 +122,46 @@ it.each([
   'initializes, restarts and performs CRUD with endpoint %s, host %s, prefix %s and region %s',
   async (endpoint, hostname, prefix, region) => {
     const objects = new Map<string, Buffer>();
-    const request = vi
-      .spyOn(transport, 'request')
-      .mockImplementation(async (target, options) => {
-        const url = new URL(target);
-        const key = url.pathname.slice(1);
-        let status = 200;
-        let data: Buffer = Buffer.alloc(0);
-        if (url.searchParams.has('versioning'))
-          data = Buffer.from('<VersioningConfiguration/>');
-        else if (url.searchParams.has('list-type')) {
-          const contents = [...objects]
-            .filter(([key]) => key.startsWith(url.searchParams.get('prefix')!))
-            .map(
-              ([key, body]) =>
-                `<Contents><Key>${key}</Key><Size>${body.length}</Size><LastModified>2026-10-08T00:00:00Z</LastModified><ETag>${digest(body)}</ETag></Contents>`,
-            )
-            .join('');
-          data = Buffer.from(
-            `<ListBucketResult><IsTruncated>false</IsTruncated>${contents}</ListBucketResult>`,
-          );
-        } else if (options.method === 'PUT') objects.set(key, Buffer.from(options.content!));
-        else if (options.method === 'DELETE') {
-          objects.delete(key);
-          status = 204;
-        } else if (objects.has(key)) data = objects.get(key)!;
-        else status = 404;
-        const headers = {
-          'content-length': String(data.length),
-          'last-modified': 'Thu, 08 Oct 2026 00:00:00 GMT',
-          etag: digest(data),
-        };
-        return {
-          status,
-          headers,
-          data,
-          res: Object.assign(Readable.from([data]), { status, headers }),
-        };
-      });
+    const requests: { method: string; url: URL }[] = [];
+    const server = nock(`https://${hostname}`).persist();
+    for (const method of ['GET', 'HEAD', 'PUT', 'DELETE']) {
+      server
+        .intercept(/.*/, method)
+        .query(true)
+        .reply(async (request: Request): Promise<nock.ReplyFnResult> => {
+          const url = new URL(request.url);
+          requests.push({ method, url });
+          const key = url.pathname.slice(1);
+          let status = 200;
+          let data: Buffer = Buffer.alloc(0);
+          if (url.searchParams.has('versioning')) data = Buffer.from('<VersioningConfiguration/>');
+          else if (url.searchParams.has('list-type')) {
+            const contents = [...objects]
+              .filter(([key]) => key.startsWith(url.searchParams.get('prefix')!))
+              .map(
+                ([key, body]) =>
+                  `<Contents><Key>${key}</Key><Size>${body.length}</Size><LastModified>2026-10-08T00:00:00Z</LastModified><ETag>${digest(body)}</ETag></Contents>`,
+              )
+              .join('');
+            data = Buffer.from(
+              `<ListBucketResult><IsTruncated>false</IsTruncated>${contents}</ListBucketResult>`,
+            );
+          } else if (method === 'PUT') {
+            objects.set(key, Buffer.from(await request.arrayBuffer()));
+          } else if (method === 'DELETE') {
+            objects.delete(key);
+            status = 204;
+          } else if (objects.has(key)) data = objects.get(key)!;
+          else status = 404;
+          const headers = {
+            connection: 'close',
+            'content-length': String(data.length),
+            'last-modified': 'Thu, 08 Oct 2026 00:00:00 GMT',
+            etag: digest(data),
+          };
+          return [status, method === 'HEAD' ? '' : data, headers];
+        });
+    }
     const settings = config({
       account: 'me',
       passwordHash: `scrypt$${'0'.repeat(32)}$${'0'.repeat(128)}`,
@@ -187,13 +195,11 @@ it.each([
     await notes.remove(id, next);
     await expect(notes.get(id)).rejects.toMatchObject({ status: 404 });
     expect([...objects.keys()]).toEqual([ownerKey]);
-    expect(new Set(request.mock.calls.map(([, options]) => options.method))).toEqual(
+    expect(new Set(requests.map(({ method }) => method))).toEqual(
       new Set(['GET', 'HEAD', 'PUT', 'DELETE']),
     );
-    for (const [target] of request.mock.calls) {
-      const url = new URL(target);
-      expect(url.protocol).toBe('https:');
-      expect(url.hostname).toBe(hostname);
+    server.done();
+    for (const { url } of requests) {
       if (url.searchParams.has('list-type'))
         expect(url.searchParams.get('prefix')).toBe(`${prefix ?? ''}notes/`);
       else if (!url.searchParams.has('versioning'))
@@ -204,11 +210,10 @@ it.each([
 it.each([false, true])(
   'fails without falling back to the public endpoint when the internal network is unavailable (initialize=%s)',
   async (initialize) => {
-    const request = vi
-      .spyOn(transport, 'request')
-      .mockRejectedValue(
-        Object.assign(new Error('unreachable'), { name: 'RequestError', status: -1 }),
-      );
+    const server = nock('https://test-bucket.oss-cn-hangzhou-internal.aliyuncs.com')
+      .get('/')
+      .query({ versioning: '' })
+      .replyWithError(Object.assign(new Error('unreachable'), { code: 'ECONNREFUSED' }));
     const settings = config({
       account: 'me',
       passwordHash: `scrypt$${'0'.repeat(32)}$${'0'.repeat(128)}`,
@@ -223,10 +228,7 @@ it.each([false, true])(
       },
     });
     await expect(runtime(settings, initialize)).rejects.toThrow('unreachable');
-    expect(request).toHaveBeenCalledTimes(1);
-    expect(new URL(request.mock.calls[0][0]).hostname).toBe(
-      'test-bucket.oss-cn-hangzhou-internal.aliyuncs.com',
-    );
+    server.done();
   },
 );
 it('persists uncertainty across restart and blocks later writes until the late write is observed', async () => {
