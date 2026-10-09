@@ -33,6 +33,9 @@ describe('Markdown content boundary', () => {
       name: 'headings, emphasis, links and inline code',
       markdown: '# 灵感\n\n中文 **加粗** 与 *斜体* [链接](https://example.com) 和 `code`',
       check(element: HTMLElement) {
+        expect(element.textContent).toBe('灵感中文 加粗 与 斜体 链接 和 code');
+        expect(element.querySelectorAll('h1')).toHaveLength(1);
+        expect(element.querySelectorAll('p')).toHaveLength(1);
         expect(element.querySelector('h1')?.textContent).toBe('灵感');
         expect(element.querySelector('strong')?.textContent).toBe('加粗');
         expect(element.querySelector('em')?.textContent).toBe('斜体');
@@ -45,6 +48,8 @@ describe('Markdown content boundary', () => {
       name: 'unordered and ordered lists',
       markdown: '- first\n- second\n\n1. 中文\n2. other',
       check(element: HTMLElement) {
+        expect(element.querySelectorAll('ul')).toHaveLength(1);
+        expect(element.querySelectorAll('ol')).toHaveLength(1);
         expect([...element.querySelectorAll('ul > li')].map((li) => li.textContent)).toEqual([
           'first',
           'second',
@@ -71,6 +76,8 @@ describe('Markdown content boundary', () => {
       name: 'multi-paragraph quotes',
       markdown: '> 引用\n>\n> 下一段',
       check(element: HTMLElement) {
+        expect(element.querySelectorAll('blockquote')).toHaveLength(1);
+        expect(element.textContent).toBe('引用下一段');
         expect([...element.querySelectorAll('blockquote > p')].map((p) => p.textContent)).toEqual([
           '引用',
           '下一段',
@@ -93,7 +100,7 @@ describe('Markdown content boundary', () => {
     },
     {
       name: 'literal punctuation and escaped formatting',
-      markdown: 'literal & <tag>\n\n\\*普通星号\\*',
+      markdown: 'literal & \\<tag\\>\n\n\\*普通星号\\*',
       check(element: HTMLElement) {
         expect([...element.querySelectorAll('p')].map((p) => p.textContent)).toEqual([
           'literal & <tag>',
@@ -104,23 +111,33 @@ describe('Markdown content boundary', () => {
     },
   ])('renders and exports $name', ({ markdown, check }) => {
     const { editor, element } = make(markdown);
+    expect(canEdit(editor, markdown)).toBe(true);
     check(element);
     const output = editor.getMarkdown();
-    check(make(output).element);
+    const reopened = make(output);
+    expect(canEdit(reopened.editor, output)).toBe(true);
+    check(reopened.element);
   });
   it.each([
     ['', '  abc  \n\n'],
     ['js', '  const x = 1;\n\n  // 尾部空格  \n'],
   ])('preserves code block language %s and whitespace', (language, content) => {
-    const { editor, element } = make(`\`\`\`${language}\n${content}\n\`\`\``);
+    const markdown = `\`\`\`${language}\n${content}\n\`\`\``;
+    const { editor, element } = make(markdown);
+    expect(canEdit(editor, markdown)).toBe(true);
+    expect(element.querySelectorAll('pre')).toHaveLength(1);
     expect(element.querySelector('pre code')?.textContent).toBe(content);
-    expect(editor.getMarkdown()).toBe(`\`\`\`${language}\n${content}\n\`\`\``);
-    expect(make(editor.getMarkdown()).element.querySelector('pre code')?.textContent).toBe(content);
+    const output = editor.getMarkdown();
+    expect(output).toBe(markdown);
+    const reopened = make(output);
+    expect(canEdit(reopened.editor, output)).toBe(true);
+    expect(reopened.element.querySelector('pre code')?.textContent).toBe(content);
   });
   it('rejects unknown structures and raw HTML before parsing', () => {
     const { editor } = make('');
     for (const md of [
       '<script>alert(1)</script>',
+      'literal & <tag>',
       '| a | b |\n| - | - |\n| c | d |',
       '![image](https://example.com/a.png)',
       '[evil](javascript:alert(1))',
@@ -208,21 +225,26 @@ describe('code block interactions', () => {
       userAgent: navigator.userAgent,
     });
     const copy = vi.fn().mockReturnValueOnce(true).mockReturnValueOnce(false);
+    const original = Object.getOwnPropertyDescriptor(document, 'execCommand');
     Object.defineProperty(document, 'execCommand', { configurable: true, value: copy });
-    const { editor } = make('```\n\n```');
-    const button = editor.view.dom.querySelectorAll<HTMLButtonElement>('button')[1];
-    button.click();
-    await vi.waitFor(() =>
-      expect(editor.view.dom.querySelector('[role=status]')!.textContent).toBe('已复制'),
-    );
-    button.click();
-    await vi.waitFor(() =>
-      expect(editor.view.dom.querySelector('[role=status]')!.textContent).toBe(
-        '复制失败，请重试',
-      ),
-    );
-    expect(document.querySelector('textarea')).toBeNull();
-    Reflect.deleteProperty(document, 'execCommand');
+    try {
+      const { editor } = make('```\n\n```');
+      const button = editor.view.dom.querySelectorAll<HTMLButtonElement>('button')[1];
+      button.click();
+      await vi.waitFor(() =>
+        expect(editor.view.dom.querySelector('[role=status]')!.textContent).toBe('已复制'),
+      );
+      button.click();
+      await vi.waitFor(() =>
+        expect(editor.view.dom.querySelector('[role=status]')!.textContent).toBe(
+          '复制失败，请重试',
+        ),
+      );
+      expect(document.querySelector('textarea')).toBeNull();
+    } finally {
+      if (original) Object.defineProperty(document, 'execCommand', original);
+      else Reflect.deleteProperty(document, 'execCommand');
+    }
   });
 
   it.each(['', '\n\nafter', '\n\n```\nnext\n```'])(

@@ -130,7 +130,7 @@ RAM 凭据只在服务端使用；不要使用主账号密钥。
 
 部署在与 Bucket 同地域的阿里云 ECS 上时，建议将上述 `region` 字段替换为 `"endpoint": "https://oss-cn-hangzhou-internal.aliyuncs.com"`（按实际地域替换），让初始化、版本检查和所有笔记读写使用 OSS 内网，无需再填写 `region`。内网访问可减少公网延迟波动，且不产生公网流量费用；部署环境必须能够路由到该内网地址，普通本机或其他云服务器通常无法直接访问。[阿里云访问域名说明](https://www.alibabacloud.com/help/zh/oss/user-guide/access-oss-via-bucket-domain-name)。
 
-`oss.region` 和 `oss.endpoint` 至少填写一个。只填 `region` 时使用该地域的公网地址；只填 `endpoint` 时直接使用指定地址；两者都填时优先使用 `endpoint`。显式填写的字段必须有效，空字符串不等于省略。`endpoint` 接受不带协议的主机名或 HTTPS 地址，统一使用 HTTPS；不要填写 Bucket 名称前缀、对象路径、凭据、查询参数或片段。内网连接失败会报告错误，不自动切回公网。修改 endpoint 后重启服务即可应用，无需重新初始化状态卷；`pmem init-oss` 和真实 OSS 集成测试也使用同一配置。
+`oss.region` 和 `oss.endpoint` 至少填写一个。只填 `region` 时使用该地域的公网地址；只填 `endpoint` 时直接使用指定地址；两者都填时优先使用 `endpoint`。显式填写的字段必须有效，空字符串不等于省略；`region` 仅允许英文字母、数字、下划线和连字符，即使填写了 `endpoint` 也会校验。`endpoint` 接受不带协议的 DNS 主机名或 HTTPS 地址，统一使用 HTTPS，不接受 IP 地址；不要填写 Bucket 名称前缀、对象路径、凭据、查询参数或片段。内网连接失败会报告错误，不自动切回公网。修改 endpoint 后重启服务即可应用，无需重新初始化状态卷；`pmem init-oss` 和真实 OSS 集成测试也使用同一配置。
 
 以下策略对应默认无前缀配置，将 `YOUR_BUCKET` 换为实际值。若显式配置了 `oss.prefix`，在策略中的 `notes/` 和 `control/` 前加上该前缀。应用仅列举笔记，不需要控制台列出所有 Bucket 的权限。HEAD 使用 `oss:GetObject`；ListObjectsV2 使用 Bucket 级 `oss:ListObjects` 加 `oss:Prefix` 条件；版本检查需要独立的 Bucket 级权限。依据：[OSS 授权操作与条件](https://www.alibabacloud.com/help/en/oss/user-guide/authorization-syntax-and-elements)、[前缀访问策略](https://www.alibabacloud.com/help/en/oss/user-guide/access-control-base-on-ram-policy)。
 

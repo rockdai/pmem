@@ -118,6 +118,8 @@ it.each([
     'https://oss-cn-hangzhou-internal.aliyuncs.com',
   ],
   ['https://oss-cn-hangzhou.aliyuncs.com', 'https://oss-cn-hangzhou.aliyuncs.com'],
+  ['vpc100-oss-cn-hangzhou.aliyuncs.com', 'https://vpc100-oss-cn-hangzhou.aliyuncs.com'],
+  ['https://vpc100-oss-cn-hangzhou.aliyuncs.com/', 'https://vpc100-oss-cn-hangzhou.aliyuncs.com'],
   [
     'oss-cn-shanghai-internal.aliyuncs.com:443',
     'https://oss-cn-shanghai-internal.aliyuncs.com',
@@ -150,6 +152,9 @@ it.each([
   ['another-bucket', 'https://another-bucket.oss-cn-shanghai-internal.aliyuncs.com:8443'],
   ['test-bucket', 'https://test-bucket.oss-accelerate.aliyuncs.com'],
   ['test-bucket', 'https://test-bucket.cn-hangzhou.oss.aliyuncs.com'],
+  ['test-bucket', 'test-bucket.vpc100-oss-cn-hangzhou.aliyuncs.com'],
+  ['test-bucket', 'https://test-bucket.vpc100-oss-cn-hangzhou.aliyuncs.com'],
+  ['another-bucket', 'https://ANOTHER-BUCKET.VPC100-OSS-CN-SHANGHAI.ALIYUNCS.COM.:8443/'],
 ])('rejects a bucket-qualified OSS endpoint for %s: %s', async (bucket, endpoint) => {
   const path = join(root, 'pmem.json');
   for (const region of [undefined, oss.region]) {
@@ -167,6 +172,7 @@ it.each([
   ['oss-cn-hangzhou', 'oss-cn-hangzhou.aliyuncs.com'],
   ['oss-cn-hangzhou-internal', 'oss-cn-hangzhou-internal.aliyuncs.com'],
   ['cn-hangzhou', 'cn-hangzhou.oss.aliyuncs.com'],
+  ['vpc100-oss-cn-hangzhou', 'vpc100-oss-cn-hangzhou.aliyuncs.com'],
 ])('accepts a service endpoint whose name overlaps with bucket %s', (bucket, endpoint) => {
   expect(
     config({ ...base, storage: 'oss', oss: { ...oss, bucket, region: undefined, endpoint } }).oss,
@@ -193,6 +199,54 @@ it.each([null, true, 123, {}, [], '', '\0'])(
   },
 );
 it.each([
+  'bad region!',
+  ' oss-cn-hangzhou',
+  'oss-cn-hangzhou ',
+  'oss-cn-hangzhou\n',
+  'oss.cn.hangzhou',
+  'oss-cn/hangzhou',
+  'oss-cn\thangzhou',
+  '杭州',
+  'oss-cn?token=private-secret',
+])(
+  'rejects an invalid OSS region format with or without an endpoint: %#',
+  (region) => {
+    for (const endpoint of [undefined, 'oss-cn-hangzhou-internal.aliyuncs.com']) {
+      expect(() => config({ ...base, storage: 'oss', oss: { ...oss, region, endpoint } })).toThrow(
+        /^oss\.region must contain only letters, digits, underscores or hyphens$/,
+      );
+    }
+  },
+);
+it.each(['oss-cn-hangzhou', 'oss-cn-shanghai', 'OSS-test_REGION-1'])(
+  'accepts a valid explicit region alongside an endpoint: %s',
+  (region) => {
+    const endpoint = 'https://oss-cn-hangzhou-internal.aliyuncs.com';
+    expect(config({ ...base, storage: 'oss', oss: { ...oss, region, endpoint } }).oss).toMatchObject({
+      region,
+      endpoint,
+    });
+  },
+);
+it.each([
+  '127.0.0.1',
+  'https://192.168.0.1:8443/',
+  '127.1',
+  '2130706433',
+  '0x7f000001',
+  'https://0177.0.0.1',
+  '127.0.0.1.',
+])(
+  'rejects an IP OSS endpoint with or without a region: %s',
+  (endpoint) => {
+    for (const region of [undefined, oss.region]) {
+      expect(() => config({ ...base, storage: 'oss', oss: { ...oss, region, endpoint } })).toThrow(
+        /^oss\.endpoint must use a DNS hostname instead of an IP address$/,
+      );
+    }
+  },
+);
+it.each([
   null,
   true,
   123,
@@ -200,6 +254,8 @@ it.each([
   '',
   ' ',
   'https://',
+  'https://[::1]',
+  '[::1]',
   'http://oss-cn-hangzhou-internal.aliyuncs.com',
   'ftp://oss-cn-hangzhou-internal.aliyuncs.com',
   'https://private-id:private-secret@oss-cn-hangzhou-internal.aliyuncs.com',

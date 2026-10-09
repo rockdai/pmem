@@ -101,6 +101,12 @@ it.each([
     undefined,
   ],
   [
+    'vpc100-oss-cn-hangzhou.aliyuncs.com',
+    'test-bucket.vpc100-oss-cn-hangzhou.aliyuncs.com',
+    undefined,
+    undefined,
+  ],
+  [
     'https://oss-cn-shanghai-internal.aliyuncs.com',
     'test-bucket.oss-cn-shanghai-internal.aliyuncs.com',
     undefined,

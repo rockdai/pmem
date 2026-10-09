@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { isIP } from 'node:net';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 export interface Config {
@@ -83,10 +84,12 @@ function ossEndpoint(input: unknown, bucket: string): string | undefined {
   } catch {
     throw new Error(message);
   }
+  if (isIP(endpoint.hostname))
+    throw new Error('oss.endpoint must use a DNS hostname instead of an IP address');
   const bucketPrefix = `${bucket.toLowerCase()}.`;
   if (
     endpoint.hostname.startsWith(bucketPrefix) &&
-    /^(?:oss-[a-z0-9-]+|[a-z0-9-]+\.oss)\.aliyuncs\.com\.?$/.test(
+    /^(?:(?:vpc100-)?oss-[a-z0-9-]+|[a-z0-9-]+\.oss)\.aliyuncs\.com\.?$/.test(
       endpoint.hostname.slice(bucketPrefix.length),
     )
   )
@@ -181,6 +184,8 @@ export function config(input: unknown, base = pmemHome()): Config {
       throw new Error('OSS prefix must be empty or a simple relative path ending in /');
     const bucket = string(oss, 'bucket');
     const region = oss.region === undefined ? undefined : string(oss, 'region');
+    if (region !== undefined && !/^[a-zA-Z0-9_-]+$/.test(region))
+      throw new Error('oss.region must contain only letters, digits, underscores or hyphens');
     const endpoint = ossEndpoint(oss.endpoint, bucket);
     if (!region && !endpoint) throw new Error('oss.region or oss.endpoint is required');
     value.oss = {
