@@ -41,6 +41,7 @@
     "vite": "^8.3.0",
     "vitest": "^5.0.1",
     "@tiptap/core": "3.31.3",
+    "@tiptap/extension-code-block": "3.31.3",
     "@tiptap/extension-hard-break": "3.31.3",
     "@tiptap/extension-task-item": "3.31.3",
     "@tiptap/extension-task-list": "3.31.3",
