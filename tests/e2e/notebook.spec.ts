@@ -667,6 +667,24 @@ test('unsupported stored Markdown is read-only and is never rewritten on open', 
   ).toBe(201);
   await page.goto(`/#/note/${id}`);
   await expect(page.getByRole('textbox', { name: '笔记原文' })).toHaveValue(body);
+  await expect(page.getByRole('textbox', { name: '笔记原文' })).toHaveAttribute('readonly', '');
+  await expect(page.locator('.note-editor')).toBeHidden();
+  const footer = page.locator('.editor-footer');
+  await expect(footer).toHaveText(`${body.length} 字符`);
+  for (const size of [
+    { width: 1280, height: 900 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(size);
+    await expect
+      .poll(() => footer.evaluate((element) => element.getBoundingClientRect().bottom))
+      .toBeCloseTo(size.height, 0);
+    expect(
+      await page
+        .locator('.main-panel')
+        .evaluate((element) => element.scrollHeight - element.clientHeight),
+    ).toBe(0);
+  }
   expect(await page.evaluate(() => 'pmemUnsafe' in window)).toBe(false);
   expect(await (await context.request.get(`/api/v1/notes/${id}`)).text()).toBe(body);
 });
