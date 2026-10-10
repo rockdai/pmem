@@ -187,6 +187,72 @@ test('dates, toolbar and editor layout stay consistent across viewport sizes', a
   await expect(page.getByRole('button', { name: '打开笔记列表' })).toBeVisible();
 });
 
+for (const [name, sizes] of [
+  [
+    'desktop',
+    [
+      { width: 1440, height: 1080 },
+      { width: 1100, height: 480 },
+    ],
+  ],
+  [
+    'mobile',
+    [
+      { width: 390, height: 844 },
+      { width: 320, height: 480 },
+    ],
+  ],
+] as const) {
+  test(`character count stays at the bottom for short notes and follows long notes on ${name}`, async ({
+    page,
+    context,
+  }) => {
+    await page.setViewportSize(sizes[0]);
+    await login(context);
+    await page.goto('/');
+    await ready(page);
+    const editor = page.getByRole('textbox', { name: '笔记正文', exact: true });
+    const footer = page.locator('.editor-footer');
+    const panel = page.locator('.main-panel');
+    const expectFooterAtBottom = async () => {
+      await expect
+        .poll(async () => {
+          const box = await footer.boundingBox();
+          return box!.y + box!.height;
+        })
+        .toBeCloseTo(page.viewportSize()!.height, 0);
+      expect(
+        await panel.evaluate((element) => element.scrollHeight - element.clientHeight),
+      ).toBe(0);
+    };
+
+    await expect(footer).toHaveText('0 字符');
+    await expectFooterAtBottom();
+    await editor.fill('短笔记');
+    await expect(footer).toHaveText('3 字符');
+    await expectFooterAtBottom();
+    await page.setViewportSize(sizes[1]);
+    await expectFooterAtBottom();
+
+    await editor.fill(Array.from({ length: 80 }, (_, i) => `第 ${i + 1} 行正文`).join('\n'));
+    await panel.evaluate((element) => {
+      element.scrollTop = 0;
+    });
+    await expect(footer).not.toBeInViewport();
+    const content = await editor.boundingBox();
+    const count = await footer.boundingBox();
+    expect(count!.y).toBeGreaterThanOrEqual(content!.y + content!.height);
+    await panel.evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+    });
+    await expect(footer).toBeInViewport();
+
+    await editor.fill('');
+    await expect(footer).toHaveText('0 字符');
+    await expectFooterAtBottom();
+  });
+}
+
 test('a confirmed delayed deletion clears its route and reloads without a missing-note error', async ({
   page,
   context,
@@ -601,6 +667,24 @@ test('unsupported stored Markdown is read-only and is never rewritten on open', 
   ).toBe(201);
   await page.goto(`/#/note/${id}`);
   await expect(page.getByRole('textbox', { name: '笔记原文' })).toHaveValue(body);
+  await expect(page.getByRole('textbox', { name: '笔记原文' })).toHaveAttribute('readonly', '');
+  await expect(page.locator('.note-editor')).toBeHidden();
+  const footer = page.locator('.editor-footer');
+  await expect(footer).toHaveText(`${body.length} 字符`);
+  for (const size of [
+    { width: 1280, height: 900 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(size);
+    await expect
+      .poll(() => footer.evaluate((element) => element.getBoundingClientRect().bottom))
+      .toBeCloseTo(size.height, 0);
+    expect(
+      await page
+        .locator('.main-panel')
+        .evaluate((element) => element.scrollHeight - element.clientHeight),
+    ).toBe(0);
+  }
   expect(await page.evaluate(() => 'pmemUnsafe' in window)).toBe(false);
   expect(await (await context.request.get(`/api/v1/notes/${id}`)).text()).toBe(body);
 });
