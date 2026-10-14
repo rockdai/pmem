@@ -1,4 +1,5 @@
 import { Editor, type JSONContent } from '@tiptap/core';
+import { Fragment, Slice } from '@tiptap/pm/model';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from '@tiptap/markdown';
 import TaskList from '@tiptap/extension-task-list';
@@ -134,13 +135,15 @@ export function createEditor(
           view.dispatch(view.state.tr.insertText(text));
           return true;
         }
-        const content = text
-          .split(/\r?\n/)
-          .map((line) => ({
-            type: 'paragraph',
-            content: line ? [{ type: 'text', text: line }] : [],
-          }));
-        editor.commands.insertContent(content);
+        const { state } = view;
+        const marks = state.storedMarks ?? state.selection.$from.marks();
+        const paragraphs = text.split(/\r\n?|\n/).map((line) =>
+          state.schema.nodes.paragraph.create(null, line ? state.schema.text(line, marks) : null),
+        );
+        const slice = Slice.maxOpen(Fragment.fromArray(paragraphs));
+        view.dispatch(
+          state.tr.replaceSelection(slice).setMeta('paste', true).setMeta('uiEvent', 'paste'),
+        );
         return true;
       },
       handleDOMEvents: {
