@@ -22,6 +22,16 @@ function make(content: string) {
   live.push(editor);
   return { editor, element };
 }
+function paste(editor: Editor, text: string, html = '') {
+  const event = new Event('paste', { bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'clipboardData', {
+    value: {
+      getData: (type: string) =>
+        type === 'text/plain' ? text : type === 'text/html' ? html : '',
+    },
+  });
+  editor.view.dom.dispatchEvent(event);
+}
 afterEach(() => {
   live.splice(0).forEach((e) => e.destroy());
   vi.restoreAllMocks();
@@ -145,6 +155,107 @@ describe('Markdown content boundary', () => {
     ])
       expect(canEdit(editor, md)).toBe(false);
     expect(canEdit(editor, '# 支持\n\n- [x] 完成')).toBe(true);
+  });
+});
+
+describe('paste', () => {
+  describe.each([
+    ['plain text', ''],
+    ['unsupported HTML', '<span>X</span>'],
+  ])('%s', (_name, html) => {
+    it.each([
+      ['middle', 2, 'AXB'],
+      ['start', 1, 'XAB'],
+      ['end', 3, 'ABX'],
+    ])('merges into the %s of a non-empty paragraph', (_position, cursor, expected) => {
+      const { editor, element } = make('AB');
+      editor.commands.setTextSelection(cursor);
+      paste(editor, 'X', html);
+      expect(editor.getMarkdown()).toBe(expected);
+      expect(element.querySelectorAll('p')).toHaveLength(1);
+    });
+  });
+
+  it.each([
+    ['LF', 'X\nY', ['AX', 'YB']],
+    ['CRLF', 'X\r\nY', ['AX', 'YB']],
+    ['CR', 'X\rY', ['AX', 'YB']],
+    ['mixed newlines', 'X\r\nY\rZ\nW', ['AX', 'Y', 'Z', 'WB']],
+    ['blank line', 'X\n\nY', ['AX', '', 'YB']],
+    ['leading and trailing newlines', '\nX\n', ['A', 'X', 'B']],
+    ['only a newline', '\n', ['A', 'B']],
+  ])('preserves %s while merging the first and last lines', (_name, text, expected) => {
+    const { editor, element } = make('AB');
+    editor.commands.setTextSelection(2);
+    paste(editor, text);
+    expect([...element.querySelectorAll('p')].map((p) => p.textContent)).toEqual(expected);
+  });
+
+  it.each([
+    ['within a paragraph', 'AremoveB', { from: 2, to: 8 }, 'X', 'AXB'],
+    ['with multiple lines', 'AremoveB', { from: 2, to: 8 }, 'X\nY', 'AX\n\nYB'],
+    ['across paragraphs', 'Aremove\n\nremoveB', { from: 2, to: 16 }, 'X', 'AXB'],
+  ])('replaces a selection %s', (_name, content, selection, text, expected) => {
+    const { editor } = make(content);
+    editor.commands.setTextSelection(selection);
+    paste(editor, text);
+    expect(editor.getMarkdown()).toBe(expected);
+  });
+
+  it('pastes into an empty paragraph', () => {
+    const { editor } = make('');
+    paste(editor, 'X');
+    expect(editor.getMarkdown()).toBe('X');
+    expect(editor.state.doc.childCount).toBe(1);
+  });
+
+  it('preserves whitespace and literal HTML while applying paste formatting', () => {
+    const { editor, element } = make('AB');
+    editor.commands.setTextSelection(2);
+    paste(editor, '  <tag> **literal**  ');
+    expect(element.querySelectorAll('p')).toHaveLength(1);
+    expect(element.textContent).toBe('A  <tag> literal  B');
+    expect(element.querySelector('tag')).toBeNull();
+    expect(element.querySelector('strong')?.textContent).toBe('literal');
+  });
+
+  it('inherits marks at the cursor across pasted lines', () => {
+    const { editor } = make('**AB**');
+    editor.commands.setTextSelection(2);
+    paste(editor, 'X\nY');
+    expect(editor.getMarkdown()).toBe('**AX**\n\n**YB**');
+  });
+
+  it('prefers stored marks over the marks at the cursor', () => {
+    const { editor } = make('**AB**');
+    editor.commands.setTextSelection(2);
+    editor.commands.unsetBold();
+    editor.commands.setItalic();
+    paste(editor, 'X');
+    expect(editor.getHTML()).toBe('<p><strong>A</strong><em>X</em><strong>B</strong></p>');
+  });
+
+  it('respects explicitly cleared marks', () => {
+    const { editor } = make('**AB**');
+    editor.commands.setTextSelection(2);
+    editor.commands.unsetBold();
+    paste(editor, 'X');
+    expect(editor.getHTML()).toBe('<p><strong>A</strong>X<strong>B</strong></p>');
+  });
+
+  it('keeps supported rich-text formatting', () => {
+    const { editor } = make('AB');
+    editor.commands.setTextSelection(2);
+    paste(editor, 'X', '<p><strong>X</strong></p>');
+    expect(editor.getHTML()).toBe('<p>A<strong>X</strong>B</p>');
+  });
+
+  it('inserts verbatim text into a code block', () => {
+    const { editor } = make('```\nAB\n```');
+    editor.commands.setTextSelection(2);
+    paste(editor, ' X\nY ', '<p><strong>X</strong></p><p>Y</p>');
+    expect(editor.getMarkdown()).toBe('```\nA X\nY B\n```');
+    expect(editor.state.doc.childCount).toBe(1);
   });
 });
 
