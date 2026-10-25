@@ -45,29 +45,44 @@ function Login({
   }
   return (
     <main className="login-page">
-      <form className="login-card" onSubmit={submit}>
+      <header className="login-header">
         <div className="brand-name">Personal Memory</div>
-        <h1>留住此刻的想法。</h1>
-        <p className="muted">一个安静的地方，记录属于你的文字。</p>
-        {message && <p role="status">{message}</p>}
-        <label>
-          账号
-          <input name="account" autoComplete="username" required autoFocus maxLength={100} />
-        </label>
-        <label>
-          密码
-          <input name="password" type="password" autoComplete="current-password" required />
-        </label>
-        {error && (
-          <p className="error" role="alert">
-            {error}
-          </p>
-        )}
-        <button className="primary" disabled={busy}>
-          {busy ? '正在登录…' : '进入笔记本'}
-        </button>
-        <small>你的笔记，保存在你自己的服务中。</small>
-      </form>
+        <span>你的私人笔记本</span>
+      </header>
+      <div className="login-layout">
+        <form className="login-card" onSubmit={submit}>
+          <h1>留住此刻的想法。</h1>
+          <p className="muted">一个安静的地方，记录属于你的文字。</p>
+          {message && <p role="status">{message}</p>}
+          <label>
+            账号
+            <input name="account" autoComplete="username" required autoFocus maxLength={100} />
+          </label>
+          <label>
+            密码
+            <input name="password" type="password" autoComplete="current-password" required />
+          </label>
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
+          <button className="primary" disabled={busy}>
+            {busy ? '正在登录…' : '进入笔记本'}
+          </button>
+          <small>你的笔记，保存在你自己的服务中。</small>
+        </form>
+        <div className="login-visual" aria-hidden="true">
+          <div className="notebook-cover">
+            <span className="notebook-index">PERSONAL MEMORY / 01</span>
+            <div className="notebook-title">
+              想法，<br />值得被留下。
+            </div>
+            <div className="notebook-lines" />
+            <span className="notebook-caption">随时记录 · 慢慢积累</span>
+          </div>
+        </div>
+      </div>
     </main>
   );
 }
@@ -529,7 +544,11 @@ function Workspace({
               className={`note-row ${controller?.draft.id === note.id ? 'selected' : ''} ${menu === note.id ? 'menu-open' : ''}`}
               key={note.id}
             >
-              <button className="note-open" onClick={() => void openNote(note.id)}>
+              <button
+                className="note-open"
+                aria-current={controller?.draft.id === note.id ? 'page' : undefined}
+                onClick={() => void openNote(note.id)}
+              >
                 <span>{note.title}</span>
                 <small>{formatDate(note.modified)}</small>
               </button>
