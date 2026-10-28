@@ -1,22 +1,25 @@
 :root {
   color-scheme: light;
-  --ink: #262626;
-  --ink-2: #585a5a;
-  --muted: #6f7573;
-  --brand: #00b96b;
-  --brand-strong: #009456;
-  --link: #0958d9;
+  --ink: #1a1a1a;
+  --ink-2: #4a4a4a;
+  --muted: #69665f;
+  --brand: #1a1a1a;
+  --brand-strong: #3d3b36;
+  --link: #2c665c;
   --bg: #ffffff;
-  --side: #fafafa;
-  --hover: #f2f3f3;
-  --active: #e9ebea;
-  --line: #e7e9e8;
-  --line-strong: #d9dbda;
-  --warn-bg: #fff8e6;
-  --warn-ink: #5c4a12;
-  --danger: #d4380d;
-  --radius: 6px;
+  --side: #f6f5f0;
+  --hover: #eeece5;
+  --active: #e6e3db;
+  --line: #dcd9d3;
+  --line-strong: #8c887e;
+  --warn-bg: #faf3df;
+  --warn-ink: #705114;
+  --danger: #a33225;
+  --success: #367568;
+  --radius: 0;
   --gutter: 32px;
+  --font-serif: 'Noto Serif SC', 'Songti SC', STSong, SimSun, Georgia, serif;
+  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
 }
 * {
   box-sizing: border-box;
@@ -31,6 +34,10 @@ body {
   font-size: 14px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+}
+::selection {
+  background: var(--active);
+  color: var(--ink);
 }
 button,
 input,
@@ -72,13 +79,14 @@ textarea {
 }
 input:focus,
 textarea:focus {
-  outline: none;
+  outline: 2px solid var(--brand-strong);
+  outline-offset: 2px;
   border-color: var(--brand-strong);
-  box-shadow: 0 0 0 3px #00b96b33;
 }
 .primary {
   background: var(--brand);
   color: #fff;
+  border: 1px solid var(--brand);
   padding: 9px 18px;
   font-weight: 500;
 }
@@ -90,23 +98,49 @@ small {
   color: var(--muted);
 }
 .brand-name {
-  font-size: 18px;
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  letter-spacing: -0.04em;
 }
 .login-page {
   min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 40px;
+  background: var(--side);
+}
+.login-header {
+  width: min(1120px, 100%);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin: 0 auto 32px;
+}
+.login-header > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.login-layout {
+  width: min(1120px, 100%);
+  margin: 0 auto;
   display: grid;
-  place-items: center;
-  padding: 24px;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--ink);
+  background: var(--bg);
 }
 .login-card {
-  width: min(400px, 100%);
+  min-width: 0;
+  padding: 56px;
 }
 .login-card h1 {
-  font-size: 32px;
-  font-weight: 700;
+  font-family: var(--font-serif);
+  font-size: clamp(32px, 3.4vw, 48px);
+  font-weight: 400;
   line-height: 1.3;
-  margin: 20px 0 8px;
+  letter-spacing: -0.04em;
+  margin: 0 0 20px;
 }
 .login-card > p {
   margin: 0 0 8px;
@@ -115,11 +149,15 @@ small {
 .login-card label {
   display: block;
   margin-top: 24px;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--ink-2);
 }
 .login-card input {
   margin-top: 8px;
+  min-height: 46px;
+  background: var(--side);
+  border-color: var(--ink);
+  font-size: 16px;
 }
 .login-card .primary {
   width: 100%;
@@ -130,7 +168,60 @@ small {
 .login-card small {
   display: block;
   text-align: center;
-  font-size: 13px;
+  font-size: 12px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.login-visual {
+  display: grid;
+  place-items: center;
+  position: relative;
+  overflow: hidden;
+  padding: 48px;
+  border-left: 1px solid var(--ink);
+  background: var(--side);
+}
+.login-visual::before {
+  content: '';
+  position: absolute;
+  width: 86%;
+  aspect-ratio: 1;
+  border-radius: 48% 52% 60% 40%;
+  background: var(--active);
+}
+.notebook-cover {
+  position: relative;
+  width: min(300px, 100%);
+  padding: 28px 24px 28px 36px;
+  border: 1px solid var(--ink);
+  background: var(--bg);
+  box-shadow: 8px 8px 0 var(--side), 9px 9px 0 var(--ink), 17px 17px 0 #c5c2bc;
+  transform: rotate(-6deg);
+}
+.notebook-cover::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 12px;
+  border-left: 1px solid var(--line);
+}
+.notebook-index,
+.notebook-caption {
+  display: block;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+.notebook-title {
+  margin: 44px 0 28px;
+  font-family: var(--font-serif);
+  font-size: 30px;
+  line-height: 1.5;
+}
+.notebook-lines {
+  height: 72px;
+  margin-bottom: 28px;
+  background: repeating-linear-gradient(transparent 0 23px, var(--line) 23px 24px);
 }
 .error {
   color: var(--danger);
@@ -139,6 +230,7 @@ small {
   padding: 80px;
   text-align: center;
   color: var(--muted);
+  font-family: var(--font-mono);
 }
 .workspace {
   display: flex;
@@ -148,19 +240,20 @@ small {
 .sidebar {
   width: 260px;
   flex-shrink: 0;
-  border-right: 1px solid var(--line);
+  border-right: 1px solid var(--ink);
   background: var(--side);
   display: flex;
   flex-direction: column;
-  padding: 16px 12px;
+  padding: 24px 16px 16px;
 }
 .brand {
   display: flex;
   align-items: center;
   min-height: 36px;
-  font-size: 16px;
-  font-weight: 600;
-  padding: 2px 0 16px;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  letter-spacing: -0.04em;
+  padding: 2px 0 24px;
 }
 .new-note {
   text-align: center;
@@ -172,8 +265,10 @@ small {
   align-items: center;
   color: var(--muted);
   font-size: 12px;
-  margin: 24px 0 4px;
+  margin: 28px 0 8px;
   padding-left: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
 }
 .list-heading button {
   padding: 2px 6px;
@@ -182,6 +277,8 @@ small {
 .sidebar nav {
   overflow: auto;
   flex: 1;
+  min-height: 0;
+  padding-bottom: 56px;
 }
 .note-row {
   position: relative;
@@ -196,12 +293,16 @@ small {
 }
 .note-row.selected {
   background: var(--active);
+  box-shadow: inset 2px 0 var(--ink);
 }
 .note-open {
   flex: 1;
   min-width: 0;
   text-align: left;
-  padding: 7px 8px;
+  padding: 12px 10px;
+}
+.note-open:focus-visible {
+  outline-offset: -2px;
 }
 .note-open:hover {
   background: transparent;
@@ -214,8 +315,9 @@ small {
 }
 .note-open small {
   display: block;
-  font-size: 12px;
-  margin-top: 1px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  margin-top: 4px;
 }
 .note-more {
   flex-shrink: 0;
@@ -246,18 +348,20 @@ small {
   min-width: 120px;
   padding: 4px;
   background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px #00000014;
+  border: 1px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--line);
 }
 .note-menu button {
   width: 100%;
   text-align: left;
+  color: var(--danger);
 }
 .empty-list {
   color: var(--muted);
   line-height: 1.8;
-  padding: 8px;
+  padding: 20px 8px;
+  font-family: var(--font-serif);
+  font-size: 15px;
 }
 .load-more {
   width: 100%;
@@ -265,7 +369,7 @@ small {
 }
 .sidebar-bottom {
   padding-top: 12px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--ink);
 }
 .sidebar-bottom > button {
   width: 100%;
@@ -278,6 +382,15 @@ small {
   align-items: center;
   padding-left: 8px;
   color: var(--ink-2);
+  margin-top: 12px;
+  gap: 8px;
+}
+.sidebar-bottom > div > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
 }
 .main-panel {
   flex: 1;
@@ -297,10 +410,10 @@ small {
   align-items: center;
   height: 52px;
   padding: 0 20px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--ink);
   position: sticky;
   top: 0;
-  background: var(--bg);
+  background: var(--side);
   z-index: 3;
 }
 .note-header > button {
@@ -319,23 +432,27 @@ small {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  margin: 28px auto 0;
-  padding: 0 var(--gutter);
+  margin: 0 auto;
+  padding: 20px var(--gutter);
   color: var(--muted);
-  font-size: 13px;
+  font-family: var(--font-mono);
+  font-size: 12px;
   min-height: 24px;
+  background: var(--side);
+  border-bottom: 1px solid var(--line);
 }
 .status-dot {
   width: 6px;
   height: 6px;
-  background: var(--brand);
+  background: var(--success);
   border-radius: 50%;
+  flex-shrink: 0;
 }
 .save-status.attention {
   color: var(--warn-ink);
 }
 .save-status.attention .status-dot {
-  background: #faad14;
+  background: var(--warn-ink);
 }
 .save-status button {
   font-size: 13px;
@@ -347,11 +464,12 @@ small {
   display: flex;
   align-items: center;
   gap: 4px;
-  margin: 8px auto 0;
-  padding: 6px calc(var(--gutter) - 8px);
+  margin: 0 auto;
+  padding: 10px calc(var(--gutter) - 8px);
   position: sticky;
   top: 0;
-  background: #fffffff2;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
   z-index: 2;
 }
 .toolbar button {
@@ -408,8 +526,9 @@ small {
 .note-editor h1,
 .note-editor h2,
 .note-editor h3 {
+  font-family: var(--font-serif);
   line-height: 1.35;
-  font-weight: 700;
+  font-weight: 500;
   margin: 28px 0 12px;
 }
 .note-editor h1 {
@@ -436,11 +555,11 @@ small {
 }
 .note-editor a {
   color: var(--link);
-  text-decoration: none;
-  border-bottom: 1px solid #9dc4ff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .note-editor blockquote {
-  border-left: 3px solid var(--line-strong);
+  border-left: 2px solid var(--ink);
   padding: 2px 0 2px 18px;
   color: var(--ink-2);
   margin: 0 0 12px;
@@ -449,7 +568,7 @@ small {
   padding-bottom: 12px;
 }
 .code-block-frame {
-  background: #f7f8f8;
+  background: var(--side);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   overflow: hidden;
@@ -462,6 +581,8 @@ small {
   color: var(--ink-2);
   font-size: 12px;
   user-select: none;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono);
 }
 .code-block-controls button:first-child {
   margin-right: auto;
@@ -474,11 +595,11 @@ small {
   line-height: 1.6;
 }
 .note-editor code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 0.9em;
-  background: #f2f3f3;
+  background: var(--hover);
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--radius);
 }
 .note-editor pre code {
   padding: 0;
@@ -513,7 +634,8 @@ small {
   height: 16px;
   margin: 0;
   border: 1px solid var(--line-strong);
-  border-radius: 4px;
+  border-radius: var(--radius);
+  padding: 0;
   background: var(--bg) center / 12px no-repeat;
   cursor: pointer;
 }
@@ -524,8 +646,10 @@ small {
 }
 .editor-footer {
   margin: auto 0 0;
-  padding: 0 var(--gutter) 32px;
-  font-size: 12px;
+  padding: 14px var(--gutter);
+  border-top: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 11px;
   color: var(--muted);
   text-align: right;
 }
@@ -536,14 +660,17 @@ small {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid #f5e6b8;
+  border-bottom: 1px solid #d7c89c;
+  gap: 12px;
+  overflow-wrap: anywhere;
 }
 .draft-hint {
   padding: 8px 20px 0;
 }
 .draft-hint button {
   color: var(--ink);
-  background: #00b96b1a;
+  background: var(--active);
+  border: 1px solid var(--line-strong);
 }
 .welcome {
   margin: 18dvh auto 0;
@@ -551,8 +678,9 @@ small {
   padding: 24px var(--gutter);
 }
 .welcome h1 {
+  font-family: var(--font-serif);
   font-size: 36px;
-  font-weight: 700;
+  font-weight: 400;
   line-height: 1.3;
   margin: 0 0 12px;
 }
@@ -575,20 +703,23 @@ small {
 .raw-note textarea {
   min-height: 50dvh;
   resize: vertical;
+  font-family: var(--font-mono);
 }
 .dialog-backdrop,
 .login-overlay {
   position: fixed;
   inset: 0;
   z-index: 20;
-  background: #00000059;
+  background: #1a1a1a59;
   display: grid;
   place-items: center;
   padding: 24px;
 }
 .login-overlay {
   padding: 0;
-  background: var(--bg);
+  display: block;
+  overflow: auto;
+  background: var(--side);
 }
 .login-overlay .login-page {
   width: 100%;
@@ -597,19 +728,23 @@ small {
   width: min(640px, 100%);
   background: var(--bg);
   padding: 24px 28px;
-  border-radius: 12px;
+  border: 1px solid var(--ink);
   max-height: 85dvh;
   overflow: auto;
-  box-shadow: 0 16px 48px #00000024;
+  box-shadow: 8px 8px 0 #c5c2bc;
 }
 .dialog header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ink);
 }
 .dialog h2 {
-  font-size: 18px;
-  font-weight: 600;
+  font-family: var(--font-serif);
+  font-size: 24px;
+  font-weight: 500;
   margin: 0;
 }
 .dialog header button {
@@ -623,6 +758,8 @@ small {
 }
 .dialog textarea {
   height: 50dvh;
+  margin-top: 20px;
+  font-family: var(--font-mono);
 }
 .draft-row {
   padding: 14px 0;
@@ -640,12 +777,21 @@ small {
   display: block;
   margin-top: 4px;
   font-size: 12px;
+  font-family: var(--font-mono);
 }
 .draft-row button {
   color: var(--ink-2);
 }
 .mobile-only {
   display: none;
+}
+@media (max-width: 1000px) {
+  .login-card {
+    padding: 40px 32px;
+  }
+  .login-visual {
+    padding: 32px;
+  }
 }
 @media (max-width: 700px) {
   :root {
@@ -654,19 +800,38 @@ small {
   .mobile-only {
     display: block;
   }
+  .login-page {
+    padding: 24px 16px;
+  }
+  .login-header {
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .login-layout {
+    max-width: 480px;
+    grid-template-columns: 1fr;
+  }
+  .login-card {
+    padding: 32px 24px;
+  }
+  .login-visual {
+    display: none;
+  }
   .sidebar {
     position: fixed;
     left: -290px;
     top: 0;
     bottom: 0;
     z-index: 12;
-    transition: left 0.16s ease;
+    visibility: hidden;
+    transition: left 0.16s ease, visibility 0.16s;
     width: 280px;
     box-shadow: 0 0 0 transparent;
   }
   .sidebar.open {
     left: 0;
-    box-shadow: 0 0 40px #0000001f;
+    visibility: visible;
+    box-shadow: 8px 0 0 #1a1a1a1f;
   }
   .sidebar-backdrop {
     position: fixed;
@@ -678,12 +843,16 @@ small {
   .note-header {
     padding: 0 8px;
   }
+  .note-header > button {
+    min-width: 40px;
+    min-height: 40px;
+  }
   .toolbar {
     padding: 4px 12px;
     top: 52px;
   }
   .save-status {
-    margin-top: 20px;
+    padding-block: 16px;
   }
   .editor-page {
     padding-bottom: 64px;
@@ -705,6 +874,12 @@ small {
   }
   .dialog {
     padding: 20px;
+  }
+  .draft-row {
+    flex-wrap: wrap;
+  }
+  .draft-row > div {
+    flex-basis: 100%;
   }
 }
 @media (prefers-reduced-motion: reduce) {

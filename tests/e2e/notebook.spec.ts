@@ -36,6 +36,80 @@ async function openMarkdown(page: Page, context: BrowserContext, body: string) {
   return id;
 }
 
+test('the editorial login stays usable on desktop and a narrow screen, including errors', async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  const account = page.getByLabel('账号');
+  const password = page.getByLabel('密码');
+  const submit = page.getByRole('button', { name: '进入笔记本' });
+  await expect(account).toBeFocused();
+  await expect(page.getByRole('heading', { name: '留住此刻的想法。' })).toBeVisible();
+  await expect(page.locator('.login-visual')).toBeVisible();
+  await expect(page.locator('.login-page')).toHaveCSS('background-color', 'rgb(246, 245, 240)');
+  await expect(submit).toHaveCSS('background-color', 'rgb(26, 26, 26)');
+  await page.screenshot({ path: testInfo.outputPath('login-desktop.png'), fullPage: true });
+
+  await page.setViewportSize({ width: 320, height: 480 });
+  await expect(page.locator('.login-visual')).toBeHidden();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+  await account.fill('me');
+  await page.keyboard.press('Tab');
+  await expect(password).toBeFocused();
+  await password.fill('incorrect-password');
+  await page.keyboard.press('Tab');
+  await expect(submit).toBeFocused();
+  await expect(submit).toHaveCSS('outline-style', 'solid');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('alert')).toHaveText('登录失败，请检查账号和密码');
+  await expect(submit).toBeEnabled();
+  await page.screenshot({ path: testInfo.outputPath('login-mobile-error.png'), fullPage: true });
+  await password.fill('browser-test-password');
+  await submit.click();
+  await ready(page);
+});
+
+test('the notebook theme keeps selection, long content and mobile navigation usable', async ({
+  page,
+  context,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const title = '留住每一个小想法';
+  await openMarkdown(
+    page,
+    context,
+    `# ${title}\n\n一个安静的地方，记录属于你的文字。\n\n> 随时记录，慢慢积累。\n\n- [x] 记录今天的灵感\n- [ ] 留一点时间给自己\n\n\`\`\`text\n${'personal-memory/'.repeat(20)}\n\`\`\``,
+  );
+  const selected = page.getByRole('navigation', { name: '笔记列表' })
+    .getByRole('button', { name: new RegExp(title) });
+  await expect(selected).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('.sidebar')).toHaveCSS('background-color', 'rgb(246, 245, 240)');
+  await expect(page.locator('.toolbar')).toHaveCSS('border-bottom-width', '1px');
+  await page.screenshot({ path: testInfo.outputPath('notebook-desktop.png'), fullPage: true });
+
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 320, height: 568 });
+  await expect(selected).toBeHidden();
+  const panel = page.locator('.main-panel');
+  expect(await panel.evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+  await page.getByRole('button', { name: '打开笔记列表' }).click();
+  await expect(selected).toBeVisible();
+  await page.getByRole('button', { name: /^本机草稿/ }).click();
+  const dialog = page.getByRole('dialog', { name: '恢复本机草稿' });
+  await expect(dialog).toBeVisible();
+  expect(await dialog.evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(0);
+  const bounds = await dialog.boundingBox();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(320);
+  await page.getByRole('button', { name: '关闭草稿' }).click();
+  await selected.click();
+  await expect(selected).toBeHidden();
+  await expect(page.getByRole('textbox', { name: '笔记正文', exact: true })).toBeEditable();
+  await page.screenshot({ path: testInfo.outputPath('notebook-mobile.png'), fullPage: true });
+});
+
 for (const modifier of ['Control', 'Meta']) {
   test(`${modifier}+A stays inside the current code block including repeated selection`, async ({
     page,
@@ -688,7 +762,7 @@ test('unsupported stored Markdown is read-only and is never rewritten on open', 
   expect(await page.evaluate(() => 'pmemUnsafe' in window)).toBe(false);
   expect(await (await context.request.get(`/api/v1/notes/${id}`)).text()).toBe(body);
 });
-test('completed task styling stays on that task and primary controls are white on the brand greens', async ({
+test('completed task styling stays on that task and primary controls use the ink palette', async ({
   context,
   page,
 }) => {
@@ -726,13 +800,13 @@ test('completed task styling stays on that task and primary controls are white o
   ).toBe(true);
   const create = page.getByRole('button', { name: /新的笔记/ });
   await expect(create).toHaveCSS('color', 'rgb(255, 255, 255)');
-  await expect(create).toHaveCSS('background-color', 'rgb(0, 185, 107)');
+  await expect(create).toHaveCSS('background-color', 'rgb(26, 26, 26)');
   await create.hover();
   await expect(create).toHaveCSS('color', 'rgb(255, 255, 255)');
-  await expect(create).toHaveCSS('background-color', 'rgb(0, 148, 86)');
+  await expect(create).toHaveCSS('background-color', 'rgb(61, 59, 54)');
   const done = editor.locator("li[data-checked='true'] > label > input"),
     todo = editor.locator("li[data-checked='false'] > label > input");
-  await expect(done).toHaveCSS('background-color', 'rgb(0, 185, 107)');
+  await expect(done).toHaveCSS('background-color', 'rgb(26, 26, 26)');
   expect(await done.evaluate((el) => getComputedStyle(el).backgroundImage)).toContain('%23fff');
   await expect(todo).toHaveCSS('background-color', 'rgb(255, 255, 255)');
 });
