@@ -25,7 +25,7 @@ export function extensions() {
       },
     }),
     HardBreak,
-    NoteCodeBlock,
+    NoteCodeBlock.configure({ exitOnTripleEnter: false }),
     TaskList,
     TaskItem.configure({ nested: true }),
     Markdown.configure({ markedOptions: { gfm: true } }),
@@ -77,11 +77,55 @@ export function hasContent(doc: JSONContent): boolean {
   return Boolean(doc.text?.trim()) || Boolean(doc.content?.some(hasContent));
 }
 
+function surroundingMarkdown(editor: Editor, index: number) {
+  const json = editor.getJSON();
+  const siblings = json.content!;
+  // Keep the document's blank-line separators on both sides of the edited block.
+  const parts = siblings.map((node, i) =>
+    i === index ? '' : editor.markdown!.renderNodeToMarkdown(node, json, i),
+  );
+  return {
+    blocks: editor.state.doc.content.content,
+    index,
+    parent: json,
+    before: parts.slice(0, index + 1).join('\n\n'),
+    after: parts.slice(index).join('\n\n'),
+    meaningful: siblings.some((node, i) => i !== index && hasContent(node)),
+  };
+}
+
 export function createEditor(
   element: HTMLElement,
   onChange: (body: string, meaningful: boolean) => void,
   onComposition?: (active: boolean) => void,
 ) {
+  let surrounding: ReturnType<typeof surroundingMarkdown> | undefined;
+  const publish = (editor: Editor) => {
+    const {
+      doc,
+      selection: { $from },
+    } = editor.state;
+    if ($from.parent.type.name === 'codeBlock') {
+      const blocks = doc.content.content;
+      const index = $from.index(0);
+      if (
+        !surrounding ||
+        surrounding.index !== index ||
+        blocks.length !== surrounding.blocks.length ||
+        !surrounding.blocks.every((node, i) => i === index || node === blocks[i])
+      ) {
+        surrounding = surroundingMarkdown(editor, index);
+      }
+      const { before, after, parent, meaningful } = surrounding;
+      const block = $from.node(1).toJSON();
+      const markdown = editor.markdown!.renderNodeToMarkdown(block, parent, index);
+      onChange(before + markdown + after, meaningful || hasContent(block));
+    } else {
+      surrounding = undefined;
+      const json = editor.getJSON();
+      onChange(editor.markdown!.serialize(json), hasContent(json));
+    }
+  };
   const editor = new Editor({
     element,
     extensions: extensions(),
@@ -154,14 +198,14 @@ export function createEditor(
         compositionend: () => {
           queueMicrotask(() => {
             onComposition?.(false);
-            onChange(editor.getMarkdown(), hasContent(editor.getJSON()));
+            if (!editor.isDestroyed) publish(editor);
           });
           return false;
         },
       },
     },
     onUpdate: ({ editor }) => {
-      if (!editor.view.composing) onChange(editor.getMarkdown(), hasContent(editor.getJSON()));
+      if (!editor.view.composing) publish(editor);
     },
   });
   return editor;

@@ -602,9 +602,13 @@ small {
   border-radius: var(--radius);
 }
 .note-editor pre code {
+  display: block;
   padding: 0;
   background: transparent;
   font-size: inherit;
+}
+.note-editor .code-lines {
+  display: block;
 }
 .note-editor ul[data-type='taskList'] {
   list-style: none;

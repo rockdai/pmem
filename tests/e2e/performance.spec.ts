@@ -1,6 +1,75 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type BrowserContext } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { cpus, platform, release } from 'node:os';
+async function seedNote(seed: BrowserContext, body: string) {
+  const response = await seed.request.post('/api/v1/auth/login', {
+    headers: { origin: 'http://127.0.0.1:4173' },
+    data: { account: 'me', password: 'browser-test-password' },
+  });
+  expect(response.status()).toBe(200);
+  const session = await response.json(),
+    id = crypto.randomUUID();
+  expect(
+    (
+      await seed.request.post(`/api/v1/notes/${id}`, {
+        headers: {
+          origin: 'http://127.0.0.1:4173',
+          'x-csrf-token': session.csrf,
+          'content-type': 'text/markdown',
+        },
+        data: body,
+      })
+    ).status(),
+  ).toBe(201);
+  return id;
+}
+
+test('30 Enter presses in a long code block stay responsive and save exactly', async ({
+  context,
+  page,
+  browserName,
+}) => {
+  test.skip(
+    process.env.PMEM_BENCH !== '1' || browserName !== 'chromium',
+    'Opt-in Chromium benchmark',
+  );
+  const initial = 'const value = true;\n'.repeat(44000);
+  const markdown = (code: string) => '```js\n' + code + '\n```';
+  const id = await seedNote(context, markdown(initial));
+  await page.goto(`/#/note/${id}`);
+  const block = page.locator('.note-editor pre code');
+  const point = await block.evaluate((code) => {
+    const panel = code.closest<HTMLElement>('.main-panel')!;
+    panel.scrollTop = (panel.scrollHeight - panel.clientHeight) / 2;
+    return {
+      x: code.closest('pre')!.getBoundingClientRect().left + 32,
+      y: panel.getBoundingClientRect().top + panel.clientHeight / 2,
+    };
+  });
+  await page.mouse.click(point.x, point.y);
+  await page.keyboard.insertText('起点');
+  const marked = (await block.textContent())!;
+  expect(marked.replace('起点', '')).toBe(initial);
+  expect(marked).toContain('起点');
+  const cdp = await context.newCDPSession(page);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+  const samples: number[] = [];
+  for (let i = 0; i < 30; i++) {
+    const start = performance.now();
+    await page.keyboard.press('Enter');
+    samples.push(performance.now() - start);
+    await page.keyboard.insertText('x');
+  }
+  const expected = marked.replace('起点', '起点' + '\nx'.repeat(30));
+  expect(await block.textContent()).toBe(expected);
+  await expect
+    .poll(async () => (await page.request.get(`/api/v1/notes/${id}`)).text())
+    .toBe(markdown(expected));
+  samples.sort((a, b) => a - b);
+  console.log('Code block Enter (ms)', { p50: samples[14], p95: samples[28], max: samples[29] });
+  expect(samples[28]).toBeLessThan(200);
+});
+
 test('production cold and warm navigation, actual input and durable recovery', async ({
   browser,
 }) => {
@@ -11,27 +80,9 @@ test('production cold and warm navigation, actual input and durable recovery', a
   if (!Number.isInteger(characters) || characters < 1 || characters > 330000)
     throw new Error('PMEM_BENCH_CHARACTERS must be 1..330000');
   const seed = await browser.newContext({ baseURL: 'http://127.0.0.1:4173' });
-  const response = await seed.request.post('/api/v1/auth/login', {
-    headers: { origin: 'http://127.0.0.1:4173' },
-    data: { account: 'me', password: 'browser-test-password' },
-  });
-  expect(response.status()).toBe(200);
-  const session = await response.json(),
-    state = await seed.storageState(),
-    id = crypto.randomUUID(),
-    initial = '普通笔记测试文字。'.repeat(Math.ceil(characters / 9)).slice(0, characters);
-  expect(
-    (
-      await seed.request.post(`/api/v1/notes/${id}`, {
-        headers: {
-          origin: 'http://127.0.0.1:4173',
-          'x-csrf-token': session.csrf,
-          'content-type': 'text/markdown',
-        },
-        data: initial,
-      })
-    ).status(),
-  ).toBe(201);
+  const initial = '普通笔记测试文字。'.repeat(Math.ceil(characters / 9)).slice(0, characters);
+  const id = await seedNote(seed, initial);
+  const state = await seed.storageState();
   const all: Record<string, unknown[]> = {},
     summary: Record<string, unknown> = {};
   for (const mode of ['cold', 'warm']) {

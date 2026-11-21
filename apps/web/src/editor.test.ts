@@ -15,9 +15,9 @@ function selectAll(editor: Editor, shortcut: string) {
     }),
   );
 }
-function make(content: string) {
+function make(content: string, onChange: (body: string, meaningful: boolean) => void = () => {}) {
   const element = document.createElement('div');
-  const editor = createEditor(element, () => {});
+  const editor = createEditor(element, onChange);
   editor.commands.setContent(content, { contentType: 'markdown', emitUpdate: false });
   live.push(editor);
   return { editor, element };
@@ -260,6 +260,59 @@ describe('paste', () => {
 });
 
 describe('code block interactions', () => {
+  it('keeps consecutive newlines inside code and allows an explicit keyboard exit', () => {
+    const changed = vi.fn();
+    const { editor } = make('before\n\n```js\nabc\n\n\n```\n\nafter', changed);
+    const start = editor.state.doc.firstChild!.nodeSize + 1;
+    editor.commands.setTextSelection(start + 5);
+    editor.commands.keyboardShortcut('Enter');
+    editor.commands.keyboardShortcut('Enter');
+    expect(editor.state.selection.$from.parent.type.name).toBe('codeBlock');
+    expect(changed).toHaveBeenLastCalledWith('before\n\n```js\nabc\n\n\n\n\n```\n\nafter', true);
+    editor.view.dom.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true, cancelable: true }),
+    );
+    expect(editor.state.selection.$from.parent.type.name).toBe('paragraph');
+  });
+
+  it('publishes complete Markdown across edits to code and its surrounding blocks', () => {
+    const changed = vi.fn();
+    const { editor } = make('# Heading\n\n*one*\n\n```js\nabc\n```\n\n- two', changed);
+    const codeStart = () =>
+      editor.state.doc.child(0).nodeSize + editor.state.doc.child(1).nodeSize + 1;
+    editor.commands.setTextSelection({ from: codeStart() + 1, to: codeStart() + 2 });
+    editor.commands.keyboardShortcut('Enter');
+    expect(editor.state.selection.$from.parent.textContent).toBe('a\nc');
+    expect(changed).toHaveBeenLastCalledWith(editor.getMarkdown(), true);
+    editor.view.dispatch(editor.state.tr.insertText('new ', 1));
+    editor.commands.keyboardShortcut('Enter');
+    expect(changed).toHaveBeenLastCalledWith(editor.getMarkdown(), true);
+    expect(editor.getMarkdown()).toContain('# new Heading');
+    editor.commands.undo();
+    expect(changed).toHaveBeenLastCalledWith(editor.getMarkdown(), true);
+
+    editor.commands.setContent('```\n\n```', { contentType: 'markdown', emitUpdate: false });
+    editor.commands.setTextSelection(1);
+    editor.commands.keyboardShortcut('Enter');
+    expect(changed).toHaveBeenLastCalledWith('```\n\n\n```', false);
+  });
+
+  it('preserves nested code, adjacent blank paragraphs and surrounding list items', () => {
+    const changed = vi.fn();
+    const { editor } = make('> ```\n> abc\n> ```\n\n- after', changed);
+    const paragraph = { type: 'paragraph' };
+    editor.commands.insertContentAt(0, [paragraph, paragraph]);
+    let position = 0;
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === 'codeBlock') position = pos + 2;
+    });
+    editor.commands.setTextSelection(position);
+    editor.commands.keyboardShortcut('Enter');
+    editor.commands.keyboardShortcut('Enter');
+    expect(editor.state.selection.$from.parent.textContent).toBe('a\n\nbc');
+    expect(changed).toHaveBeenLastCalledWith(editor.getMarkdown(), true);
+  });
+
   it.each(['Ctrl-a', 'Meta-a'])('selects only the current code block with %s', (shortcut) => {
     const { editor } = make('before\n\n```js\n  first\nsecond  \n```\n\nafter');
     const start = editor.state.doc.firstChild!.nodeSize + 1;
