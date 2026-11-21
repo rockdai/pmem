@@ -151,6 +151,60 @@ for (const modifier of ['Control', 'Meta']) {
   });
 }
 
+test('Enter in the middle and at the end of long code survives save and reload', async ({
+  page,
+  context,
+}) => {
+  const before = 'A paragraph with **bold** text.\n\n'.repeat(400);
+  const left = '  const first = "中文";\n'.repeat(600);
+  const right = '  const second = "🐈";\n'.repeat(600);
+  const code = left + 'middle' + right + '\n';
+  const markdown = (value: string) => before + '```js\n' + value + '\n```\n\nafter';
+  const id = await openMarkdown(page, context, markdown(code));
+  const block = page.locator('.note-editor pre code');
+  await page.getByRole('textbox', { name: '笔记正文', exact: true }).focus();
+  const select = (offset: number, length = 0) =>
+    block.evaluate(
+      async (element, { offset, length }) => {
+        const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+        while (walker.nextNode()) {
+          const text = walker.currentNode as Text;
+          if (offset + length <= text.length) {
+            const changed = new Promise<void>((resolve) =>
+              document.addEventListener('selectionchange', () => resolve(), { once: true }),
+            );
+            getSelection()!.setBaseAndExtent(text, offset, text, offset + length);
+            await changed;
+            return;
+          }
+          offset -= text.length;
+        }
+        throw new Error('Missing code selection');
+      },
+      { offset, length },
+    );
+  await select(left.length + 1);
+  await page.keyboard.press('Control+a');
+  expect(await page.evaluate(() => getSelection()?.toString())).toBe(code);
+  await select(left.length, 'middle'.length);
+  await page.keyboard.press('Enter');
+  await page.keyboard.insertText('中间');
+  expect(await block.textContent()).toBe(left + '\n中间' + right + '\n');
+  await select((left + '\n中间' + right + '\n').length);
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await page.keyboard.insertText('末尾');
+  const expected = left + '\n中间' + right + '\n\n\n末尾';
+  expect(await block.textContent()).toBe(expected);
+  await page.keyboard.press('ControlOrMeta+s');
+  await expect
+    .poll(async () => (await page.request.get(`/api/v1/notes/${id}`)).text())
+    .toBe(markdown(expected));
+  await page.reload();
+  await expect(block).toBeVisible();
+  expect(await block.textContent()).toBe(expected);
+});
+
 test('code controls collapse, expand and copy without saving UI text', async ({
   page,
   context,

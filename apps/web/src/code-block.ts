@@ -1,6 +1,32 @@
 import type { Editor } from '@tiptap/core';
 import CodeBlock from '@tiptap/extension-code-block';
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { Plugin, TextSelection } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
+
+const CODE_GROUP_SIZE = 4096;
+
+function groupCodeLines(doc: ProseMirrorNode) {
+  const groups: Decoration[] = [];
+  doc.descendants((node, position) => {
+    if (node.type.name !== 'codeBlock') return !node.isTextblock;
+    if (node.content.size < 2 * CODE_GROUP_SIZE) return false;
+    const text = node.textContent;
+    let from = 0;
+    // Break only after real newlines so layout can reuse the unaffected groups.
+    while (from < text.length) {
+      const newline = text.indexOf('\n', from + CODE_GROUP_SIZE);
+      if (newline < 0 || newline + 1 === text.length) break;
+      const to = newline + 1;
+      groups.push(
+        Decoration.inline(position + 1 + from, position + 1 + to, { class: 'code-lines' }),
+      );
+      from = to;
+    }
+    return false;
+  });
+  return DecorationSet.create(doc, groups);
+}
 
 export function focusAfterCodeBlock(editor: Editor, position: number) {
   if (!editor.isEditable) return false;
@@ -46,8 +72,15 @@ export const NoteCodeBlock = CodeBlock.extend({
   addProseMirrorPlugins() {
     return [
       ...(this.parent?.() ?? []),
-      new Plugin({
+      new Plugin<DecorationSet>({
+        state: {
+          init: (_, state) => groupCodeLines(state.doc),
+          apply: (tr, groups) => (tr.docChanged ? groupCodeLines(tr.doc) : groups),
+        },
         props: {
+          decorations(state) {
+            return this.getState(state);
+          },
           handleClick: (view, _position, event) => {
             const last = view.state.doc.lastChild;
             if (event.target !== view.dom || last?.type.name !== this.name) return false;
@@ -119,8 +152,9 @@ export const NoteCodeBlock = CodeBlock.extend({
         contentDOM: code,
         update(next) {
           if (next.type !== current.type) return false;
+          const languageChanged = next.attrs.language !== current.attrs.language;
           current = next;
-          updateLanguage();
+          if (languageChanged) updateLanguage();
           return true;
         },
         stopEvent: (event) =>
