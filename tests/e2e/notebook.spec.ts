@@ -205,13 +205,8 @@ test('Enter in the middle and at the end of long code survives save and reload',
   expect(await block.textContent()).toBe(expected);
 });
 
-test('code controls collapse, expand and copy without saving UI text', async ({
-  page,
-  context,
-}) => {
-  const body = '```js\n  first\nsecond  \n```';
-  const id = await openMarkdown(page, context, body);
-  await page.evaluate(() => {
+function captureCopiedCode(page: Page) {
+  return page.evaluate(() => {
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: {
@@ -221,6 +216,15 @@ test('code controls collapse, expand and copy without saving UI text', async ({
       },
     });
   });
+}
+
+test('code controls collapse, expand and copy without saving UI text', async ({
+  page,
+  context,
+}) => {
+  const body = '```js\n  first\nsecond  \n```';
+  const id = await openMarkdown(page, context, body);
+  await captureCopiedCode(page);
   const writes: string[] = [];
   page.on('request', (r) => {
     if (r.method() === 'PUT') writes.push(r.url());
@@ -243,6 +247,95 @@ test('code controls collapse, expand and copy without saving UI text', async ({
   await page.waitForTimeout(600);
   expect(writes).toEqual([]);
   expect(await (await page.request.get(`/api/v1/notes/${id}`)).text()).toBe(body);
+});
+
+test('code block handle opens a dismissible menu, copies verbatim and deletes only that block', async ({
+  page,
+  context,
+}) => {
+  const raw = '  first\n\nlast  ';
+  const first = '```js\n' + raw + '\n```';
+  const rest = 'middle\n\n```sh\nkeep\n```';
+  const id = await openMarkdown(page, context, first + '\n\n' + rest);
+  await captureCopiedCode(page);
+  const block = page.locator('.code-block').first();
+  const handle = block.getByRole('button', { name: '代码块操作' });
+  const menu = block.getByRole('menu', { name: '代码块操作' });
+  await expect(handle).toHaveCSS('opacity', '0');
+  await block.hover();
+  await expect(handle).toHaveCSS('opacity', '1');
+  const grip = await handle.boundingBox();
+  const frame = await block.boundingBox();
+  expect(grip!.x + grip!.width).toBeLessThanOrEqual(frame!.x);
+  await handle.click();
+  await expect(menu.getByRole('menuitem')).toHaveText(['复制', '删除']);
+  await expect(menu.getByRole('menuitem', { name: '复制' })).toBeFocused();
+  await handle.click();
+  await expect(menu).toBeHidden();
+  await handle.click();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('menuitem', { name: '删除' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  await expect(handle).toBeFocused();
+  await handle.press('Enter');
+  await menu.getByRole('menuitem', { name: '复制' }).click();
+  await expect(block.getByRole('status')).toHaveText('已复制');
+  expect(await page.evaluate(() => document.documentElement.dataset.copied)).toBe(raw);
+  await expect(menu).toBeHidden();
+  await handle.click();
+  await page.locator('.note-editor > p').click();
+  await expect(menu).toBeHidden();
+  await block.hover();
+  await handle.click();
+  await menu.getByRole('menuitem', { name: '删除' }).click();
+  await expect
+    .poll(async () => (await context.request.get(`/api/v1/notes/${id}`)).text())
+    .toBe(rest);
+  await page.reload();
+  await expect(page.locator('.note-editor pre code')).toHaveText('keep');
+});
+
+test('dragging the code block handle moves the whole block up and down and persists its order', async ({
+  page,
+  context,
+}) => {
+  const code = '```ts\n  const x = 1;\n\nend  \n```';
+  const other = '```sh\nkeep\n```';
+  const id = await openMarkdown(
+    page,
+    context,
+    ['start', other, 'middle', code, 'end'].join('\n\n'),
+  );
+  const block = page.locator('.code-block').filter({ has: page.locator('.language-ts') });
+  const handle = block.getByRole('button', { name: '代码块操作' });
+  const saved = async () => (await context.request.get(`/api/v1/notes/${id}`)).text();
+  const otherHeader = page
+    .locator('.code-block')
+    .filter({ has: page.locator('.language-sh') })
+    .locator('.code-block-controls');
+  await block.hover();
+  await handle.dragTo(otherHeader, { steps: 12, targetPosition: { x: 50, y: 2 } });
+  await expect.poll(saved).toBe(['start', code, other, 'middle', 'end'].join('\n\n'));
+  await block.hover();
+  await handle.dragTo(page.locator('.note-editor > p').first(), {
+    steps: 12,
+    targetPosition: { x: 1, y: 2 },
+  });
+  await expect.poll(saved).toBe([code, 'start', other, 'middle', 'end'].join('\n\n'));
+  await expect(page.getByRole('menu', { name: '代码块操作' })).toBeHidden();
+  await block.getByRole('button', { name: '收起' }).click();
+  await block.hover();
+  await handle.dragTo(page.locator('.note-editor > p').last(), {
+    steps: 12,
+    targetPosition: { x: 100, y: 20 },
+  });
+  await expect.poll(saved).toBe(['start', other, 'middle', 'end', code].join('\n\n'));
+  await page.reload();
+  await expect(page.locator('.note-editor > :last-child pre code')).toHaveClass('language-ts');
+  expect(await page.locator('.note-editor > :last-child pre code').textContent()).toBe(
+    '  const x = 1;\n\nend  ',
+  );
 });
 
 for (const area of ['gap', 'editor', 'page']) {

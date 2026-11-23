@@ -565,7 +565,70 @@ small {
   margin: 0 0 12px;
 }
 .code-block {
+  position: relative;
   padding-bottom: 12px;
+}
+.code-block-actions {
+  position: absolute;
+  top: 3px;
+  right: 100%;
+  user-select: none;
+}
+.code-block-actions:focus-within {
+  z-index: 1;
+}
+.code-block-handle {
+  width: min(28px, var(--gutter));
+  height: 28px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  cursor: grab;
+  opacity: 0;
+  pointer-events: none;
+}
+.code-block-handle::before {
+  content: '';
+  width: 12px;
+  height: 18px;
+  background: radial-gradient(circle, currentColor 1.5px, transparent 1.7px) 0 0 / 6px 6px;
+}
+.code-block-handle:active {
+  cursor: grabbing;
+}
+.code-block:hover .code-block-handle,
+.code-block-handle:active,
+.code-block-actions:focus-within .code-block-handle,
+.code-block-handle[aria-expanded='true'] {
+  opacity: 1;
+  pointer-events: auto;
+}
+.note-editor[contenteditable='false'] .code-block-actions {
+  display: none;
+}
+.code-block-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 88px;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--line);
+}
+.code-block-menu button {
+  width: 100%;
+  text-align: left;
+}
+.code-block-menu button:last-child {
+  color: var(--danger);
+}
+@media (hover: none) {
+  .code-block-handle {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 .code-block-frame {
   background: var(--side);
