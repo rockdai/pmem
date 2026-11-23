@@ -411,6 +411,41 @@ describe('code block interactions', () => {
     }
   });
 
+  it('deletes the chosen code block at its current position and restores it on undo', () => {
+    const first = '```js\nkeep\n```';
+    const second = '```sh\n  move me  \n\n```';
+    const { editor, element } = make([first, 'middle', second].join('\n\n'));
+    const block = element.querySelectorAll('.code-block')[1];
+    editor.commands.insertContentAt(0, {
+      type: 'paragraph',
+      content: [{ type: 'text', text: 'new' }],
+    });
+    const before = editor.getMarkdown();
+    block.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!.click();
+    block.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')[1].click();
+    expect(editor.getMarkdown()).toBe(['new', first, 'middle'].join('\n\n'));
+    expect(editor.commands.undo()).toBe(true);
+    expect(editor.getMarkdown()).toBe(before);
+  });
+
+  it('keeps a paragraph for typing after deleting the only block, and guards read-only notes', () => {
+    const { editor, element } = make('```\nonly\n```');
+    const handle = element.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!;
+    const menu = element.querySelector<HTMLElement>('[role="menu"]')!;
+    const remove = menu.querySelectorAll<HTMLButtonElement>('button')[1];
+    editor.setEditable(false);
+    handle.click();
+    expect(menu.hidden).toBe(true);
+    remove.click();
+    expect(editor.getMarkdown()).toBe('```\nonly\n```');
+    editor.setEditable(true);
+    handle.click();
+    remove.click();
+    expect(editor.state.doc.firstChild?.type.name).toBe('paragraph');
+    editor.commands.insertContent('again');
+    expect(editor.getMarkdown()).toBe('again');
+  });
+
   it.each(['', '\n\nafter', '\n\n```\nnext\n```'])(
     'enters a paragraph after code without changing nearby blocks: %s',
     (suffix) => {

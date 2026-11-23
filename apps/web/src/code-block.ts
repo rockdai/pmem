@@ -1,7 +1,7 @@
 import type { Editor } from '@tiptap/core';
 import CodeBlock from '@tiptap/extension-code-block';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
-import { Plugin, TextSelection } from '@tiptap/pm/state';
+import { NodeSelection, Plugin, TextSelection } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 
 const CODE_GROUP_SIZE = 4096;
@@ -58,6 +58,85 @@ async function copyCode(text: string) {
     field.remove();
     if (active instanceof HTMLElement) active.focus();
   }
+}
+
+function codeBlockActions(editor: Editor, getPos: () => number | undefined, onCopy: () => void) {
+  const dom = document.createElement('div');
+  dom.className = 'code-block-actions';
+  dom.contentEditable = 'false';
+  const handle = document.createElement('button');
+  handle.type = 'button';
+  handle.className = 'code-block-handle';
+  handle.draggable = true;
+  handle.title = '拖动代码块，或点击打开菜单';
+  handle.setAttribute('aria-label', '代码块操作');
+  handle.setAttribute('aria-haspopup', 'menu');
+  handle.setAttribute('aria-expanded', 'false');
+  const menu = document.createElement('div');
+  menu.className = 'code-block-menu';
+  menu.hidden = true;
+  menu.setAttribute('role', 'menu');
+  menu.setAttribute('aria-label', '代码块操作');
+  const item = (label: string) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.tabIndex = -1;
+    button.textContent = label;
+    button.setAttribute('role', 'menuitem');
+    menu.append(button);
+    return button;
+  };
+  const copy = item('复制');
+  const remove = item('删除');
+  dom.append(handle, menu);
+
+  const dismiss = (event: Event) => {
+    if (event.target instanceof Node && !dom.contains(event.target)) close();
+  };
+  const close = () => {
+    menu.hidden = true;
+    handle.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('pointerdown', dismiss, true);
+  };
+  handle.onclick = () => {
+    if (!editor.isEditable || !menu.hidden) return close();
+    menu.hidden = false;
+    handle.setAttribute('aria-expanded', 'true');
+    document.addEventListener('pointerdown', dismiss, true);
+    copy.focus();
+  };
+  menu.onkeydown = (event) => {
+    if (event.key === 'Escape' || event.key === 'Tab') {
+      close();
+      handle.focus();
+      if (event.key === 'Tab') return;
+    } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      (document.activeElement === copy ? remove : copy).focus();
+    } else return;
+    event.preventDefault();
+  };
+  copy.onclick = () => {
+    close();
+    handle.focus();
+    onCopy();
+  };
+  remove.onclick = () => {
+    close();
+    const pos = getPos();
+    if (!editor.isEditable || pos === undefined) return;
+    const node = editor.state.doc.nodeAt(pos);
+    if (node?.type.name !== 'codeBlock') return;
+    editor.view.dispatch(editor.state.tr.delete(pos, pos + node.nodeSize));
+    editor.view.focus();
+  };
+  handle.ondragstart = (event) => {
+    close();
+    const pos = getPos();
+    if (!editor.isEditable || pos === undefined) return event.preventDefault();
+    const { state, view } = editor;
+    view.dispatch(state.tr.setSelection(NodeSelection.create(state.doc, pos)));
+  };
+  return { dom, destroy: close };
 }
 
 export const NoteCodeBlock = CodeBlock.extend({
@@ -132,7 +211,7 @@ export const NoteCodeBlock = CodeBlock.extend({
         collapse.textContent = pre.hidden ? '展开' : '收起';
         collapse.setAttribute('aria-expanded', String(!pre.hidden));
       };
-      copy.onclick = async () => {
+      const copyCurrentCode = async () => {
         status.textContent = '';
         try {
           await copyCode(current.textContent);
@@ -141,6 +220,9 @@ export const NoteCodeBlock = CodeBlock.extend({
           status.textContent = '复制失败，请重试';
         }
       };
+      copy.onclick = copyCurrentCode;
+      const actions = codeBlockActions(editor, getPos, copyCurrentCode);
+      dom.append(actions.dom);
       dom.onmousedown = (event) => {
         if (event.target !== dom || event.button !== 0) return;
         const position = getPos();
@@ -157,8 +239,12 @@ export const NoteCodeBlock = CodeBlock.extend({
           if (languageChanged) updateLanguage();
           return true;
         },
+        destroy: actions.destroy,
         stopEvent: (event) =>
-          event.target instanceof globalThis.Node && controls.contains(event.target),
+          event.target instanceof Node &&
+          (controls.contains(event.target) || actions.dom.contains(event.target)) &&
+          !event.type.startsWith('drag') &&
+          event.type !== 'drop',
         ignoreMutation: (mutation) =>
           mutation.type !== 'selection' &&
           (!code.contains(mutation.target) ||
