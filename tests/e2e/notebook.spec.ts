@@ -249,6 +249,32 @@ test('code controls collapse, expand and copy without saving UI text', async ({
   expect(await (await page.request.get(`/api/v1/notes/${id}`)).text()).toBe(body);
 });
 
+test('the code block handle and its visible dots align with the top border', async ({
+  page,
+  context,
+}) => {
+  await openMarkdown(page, context, '```js\ncode\n```');
+  const block = page.locator('.code-block');
+  const handle = block.getByRole('button', { name: '代码块操作' });
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 800 });
+    for (const toggle of ['收起', '展开']) {
+      await page.mouse.move(0, 0);
+      await expect(handle).toHaveCSS('opacity', '0');
+      const grip = (await handle.boundingBox())!;
+      const frame = (await block.locator('.code-block-frame').boundingBox())!;
+      expect(grip.x + grip.width).toBeLessThanOrEqual(frame.x);
+      expect(grip.y).toBe(frame.y);
+      const clip = { x: grip.x, y: Math.ceil(frame.y), width: grip.width, height: 1 };
+      const beforeHover = await page.screenshot({ clip });
+      await block.hover();
+      await expect(handle).toHaveCSS('opacity', '1');
+      expect(await page.screenshot({ clip })).not.toEqual(beforeHover);
+      await block.getByRole('button', { name: toggle }).click();
+    }
+  }
+});
+
 test('code block handle opens a dismissible menu, copies verbatim and deletes only that block', async ({
   page,
   context,
@@ -264,9 +290,6 @@ test('code block handle opens a dismissible menu, copies verbatim and deletes on
   await expect(handle).toHaveCSS('opacity', '0');
   await block.hover();
   await expect(handle).toHaveCSS('opacity', '1');
-  const grip = await handle.boundingBox();
-  const frame = await block.boundingBox();
-  expect(grip!.x + grip!.width).toBeLessThanOrEqual(frame!.x);
   await handle.click();
   await expect(menu.getByRole('menuitem')).toHaveText(['复制', '删除']);
   await expect(menu.getByRole('menuitem', { name: '复制' })).toBeFocused();
