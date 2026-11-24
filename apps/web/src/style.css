@@ -570,7 +570,7 @@ small {
 }
 .code-block-actions {
   position: absolute;
-  top: 3px;
+  top: 0;
   right: 100%;
   user-select: none;
 }
@@ -582,7 +582,7 @@ small {
   height: 28px;
   padding: 0;
   display: grid;
-  place-items: center;
+  place-items: start center;
   color: var(--muted);
   cursor: grab;
   opacity: 0;
@@ -592,7 +592,8 @@ small {
   content: '';
   width: 12px;
   height: 18px;
-  background: radial-gradient(circle, currentColor 1.5px, transparent 1.7px) 0 0 / 6px 6px;
+  background: radial-gradient(circle at 50% 1.5px, currentColor 1.5px, transparent 1.7px)
+    0 0 / 6px 6px;
 }
 .code-block-handle:active {
   cursor: grabbing;
